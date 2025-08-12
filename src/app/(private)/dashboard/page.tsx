@@ -1,12 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button, Layout, Menu, Table, Tag } from "antd";
+import { Table, Tag } from "antd";
 import api from "@/lib/axios";
-import { logout as serverLogout } from "./actions";
-
-const { Header, Content, Sider } = Layout;
+import PageHeader from "@/components/PageHeader";
 
 const DashboardPage = () => {
   const [messages, setMessages] = useState<any[]>([]);
@@ -16,7 +13,6 @@ const DashboardPage = () => {
     pageSize: 10,
     total: 0,
   });
-  const router = useRouter();
 
   const fetchMessages = async (page = 1, limit = 10) => {
     setLoading(true);
@@ -44,12 +40,6 @@ const DashboardPage = () => {
 
   const handleTableChange = (pag: any) => {
     fetchMessages(pag.current, pag.pageSize);
-  };
-
-  const handleLogout = async () => {
-    await serverLogout();
-    localStorage.removeItem("token");
-    router.push("/login");
   };
 
   const columns = [
@@ -109,70 +99,42 @@ const DashboardPage = () => {
       key: "action",
       render: (_: any, record: any) =>
         record.status === "success" ? (
-          <Button
-            icon={
-              <span role="img" aria-label="descargar">
-                📥
-              </span>
-            }
+          <button
             onClick={() => {
               window.open(record.fileUrl, "_blank");
             }}
           >
             Descargar factura
-          </Button>
+          </button>
         ) : record.status === "failure" ? (
           <span style={{ color: "red" }}>{record.reason}</span>
         ) : (
-          <>
-            <p>No disponible.</p>
-          </>
+          <p>No disponible.</p>
         ),
     },
   ];
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider>
-        <div className="logo" />
-        <Menu
-          theme="dark"
-          defaultSelectedKeys={["1"]}
-          mode="inline"
-          items={[{ key: "1", label: "Facturas" }]}
-        />
-      </Sider>
-      <Layout>
-        <Header
-          style={{
-            background: "#fff",
-            padding: "0 16px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div></div>
-          <Button onClick={handleLogout}>Cerrar sesión</Button>
-        </Header>
-        <Content style={{ margin: "16px" }}>
-          <Table
-            columns={columns}
-            dataSource={messages}
-            loading={loading}
-            rowKey="_id"
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
-              total: pagination.total,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50],
-            }}
-            onChange={handleTableChange}
-          />
-        </Content>
-      </Layout>
-    </Layout>
+    <>
+      <PageHeader
+        title="Panel de Facturas"
+        description="Visualiza el historial de envíos de SMS"
+      />
+      <Table
+        columns={columns}
+        dataSource={messages}
+        loading={loading}
+        rowKey="_id"
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          showSizeChanger: true,
+          pageSizeOptions: [10, 20, 50],
+        }}
+        onChange={handleTableChange}
+      />
+    </>
   );
 };
 
