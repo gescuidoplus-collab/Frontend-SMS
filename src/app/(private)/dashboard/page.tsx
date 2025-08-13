@@ -44,35 +44,34 @@ const DashboardPage = () => {
 
   const columns = [
     {
-      title: "Destino",
-      dataIndex: "phoneNumber",
-      key: "phoneNumber",
+      title: "Tipo de Archivo",
+      dataIndex: "messageType",
+      key: "messageType",
+      render: (type: string) =>
+        type === "payRoll" ? (
+          <Tag color="blue">Nómina</Tag>
+        ) : type === "invoice" ? (
+          <Tag color="gold">Factura</Tag>
+        ) : (
+          <Tag>{type}</Tag>
+        ),
     },
     {
       title: "Fecha",
       dataIndex: "sentAt",
       key: "sentAt",
       render: (sentAt: string) =>
-        new Date(sentAt).toLocaleString("es-ES", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-    },
-    {
-      title: "Tipo de Archivo",
-      dataIndex: "messageType",
-      key: "messageType",
-      render: (type: string) =>
-        type === "payRool" ? (
-          <Tag color="blue">Nómina</Tag>
-        ) : type === "invoce" ? (
-          <Tag color="gold">Factura</Tag>
+        sentAt ? (
+          new Date(sentAt).toLocaleString("es-ES", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
         ) : (
-          <Tag>{type}</Tag>
+          <span style={{ color: "#aaa" }}>No disponible</span>
         ),
     },
     {
@@ -104,15 +103,72 @@ const DashboardPage = () => {
               window.open(record.fileUrl, "_blank");
             }}
           >
-            Descargar factura
+            Descargar archivo
           </button>
         ) : record.status === "failure" ? (
-          <span style={{ color: "red" }}>{record.reason}</span>
+          <span style={{ color: "red" }}>
+            {record.reason || "No disponible"}
+          </span>
         ) : (
           <p>No disponible.</p>
         ),
     },
   ];
+
+  const expandedRowRender = (record: any) => (
+    <div style={{ padding: "16px 0" }}>
+      <div>
+        <b>Destinatario principal:</b>
+        <div>
+          <span style={{ color: "#1677ff" }}>
+            {record.recipient?.fullName || "No disponible"}
+          </span>
+          <br />
+          <span>{record.recipient?.phoneNumber || "No disponible"}</span>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <b>Mensaje:</b>
+          <div
+            style={{
+              background: "#f6f8fa",
+              borderRadius: 8,
+              padding: 8,
+              wordBreak: "break-word",
+              marginTop: 4,
+            }}
+          >
+            {record.recipient?.message || "No disponible"}
+          </div>
+        </div>
+      </div>
+      {record.messageType === "payRoll" && record.employe && (
+        <div style={{ marginTop: 16 }}>
+          <b>Segundo destinatario:</b>
+          <div>
+            <span style={{ color: "#1677ff" }}>
+              {record.employe.fullName || "No disponible"}
+            </span>
+            <br />
+            <span>{record.employe.phoneNumber || "No disponible"}</span>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <b>Mensaje:</b>
+            <div
+              style={{
+                background: "#f6f8fa",
+                borderRadius: 8,
+                padding: 8,
+                wordBreak: "break-word",
+                marginTop: 4,
+              }}
+            >
+              {record.employe.message || "No disponible"}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -125,6 +181,10 @@ const DashboardPage = () => {
         dataSource={messages}
         loading={loading}
         rowKey="_id"
+        expandable={{
+          expandedRowRender,
+          expandRowByClick: true,
+        }}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,
