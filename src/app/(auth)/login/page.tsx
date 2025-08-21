@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button, Form, Input } from "antd";
 import api from "@/lib/axios";
@@ -9,7 +10,12 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const onFinish = async (values: any) => {
+  interface LoginFormValues {
+    username: string;
+    password: string;
+    [key: string]: unknown;
+  }
+  const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
       const response = await api.post("/auth/login/", values);
@@ -123,18 +129,18 @@ const LoginPage = () => {
                 objectFit: "cover",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
                 background: "#f0f4fa",
-              }}
-            />
-          </div>
-          <Form onFinish={onFinish} style={{ width: "100%" }}>
-            <Form.Item
-              name="email"
-              rules={[
-                { required: true, message: "Por favor ingresa tu email!" },
-              ]}
-            >
-              <Input placeholder="Email" size="large" />
-            </Form.Item>
+              <Image
+                src="/LogCuidoFam.jpg"
+                alt="Logo"
+                width={90}
+                height={90}
+                style={{
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+                  background: "#f0f4fa",
+                }}
+              />
             <Form.Item
               name="password"
               rules={[
