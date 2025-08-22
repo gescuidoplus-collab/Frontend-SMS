@@ -29,8 +29,32 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploy (Vercel – Agosto 2025)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Crea un nuevo proyecto en Vercel e importa este repositorio.
+2. En la sección Environment Variables agrega:
+   - `NEXT_PUBLIC_API_BASE_URL` -> URL pública de tu backend (ej: https://api.mi-dominio.com)
+3. (Opcional) Ajusta `vercel.json` si necesitas otra región o más variables.
+4. Build Command: (por defecto) `npm run build` – ya definido.
+5. Output Directory: `.next`
+6. Framework detectado automáticamente (Next.js 15+).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Variables de entorno locales
+Copia `.env.example` a `.env.local` y modifica valores:
+```
+cp .env.example .env.local
+```
+
+### Seguridad / Headers
+Se añadieron headers de seguridad y una política CSP básica en `next.config.ts`. Ajusta dominios (por ejemplo para fuentes, imágenes externas) si agregas nuevos orígenes.
+
+### Imágenes remotas
+Actualiza la sección `images.remotePatterns` en `next.config.ts` si tu API u otros dominios entregan imágenes.
+
+### Optimización
+- `optimizePackageImports` para antd (Next 15 / Agosto 2025) reduce el bundle.
+- React Strict Mode habilitado.
+
+### Troubleshooting
+- Error 403 a la API: confirma que `NEXT_PUBLIC_API_BASE_URL` apunta al host correcto y que CORS en backend permite origen del dominio Vercel.
+- CSP bloquea recursos: revisa consola del navegador y añade el dominio faltante en la cadena `Content-Security-Policy`.
