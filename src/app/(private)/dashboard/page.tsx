@@ -2,20 +2,27 @@
 
 import React, { useEffect, useState } from "react";
 import { Table, Tag } from "antd";
+import type { TablePaginationConfig } from "antd/es/table";
+import type { FilterValue, SorterResult } from "antd/es/table/interface";
 import api from "@/lib/axios";
 import PageHeader from "@/components/PageHeader";
 
 const DashboardPage = () => {
+  interface PersonInfo {
+    fullName?: string;
+    phoneNumber?: string;
+    message?: string;
+  }
+
   interface Message {
+    _id?: string;
     messageType: string;
     sentAt: string;
     status: string;
     fileUrl?: string;
     reason?: string;
-    recipient?: {
-      fullName?: string;
-      phoneNumber?: string;
-    };
+    recipient?: PersonInfo;
+    employe?: PersonInfo; // segundo destinatario cuando messageType === "payRoll"
     [key: string]: unknown;
   }
   const [messages, setMessages] = useState<Message[]>([]);
@@ -50,13 +57,15 @@ const DashboardPage = () => {
     // eslint-disable-next-line
   }, []);
 
-  interface Pagination {
-    current: number;
-    pageSize: number;
-    total: number;
-  }
-  const handleTableChange = (pag: Pagination) => {
-    fetchMessages(pag.current, pag.pageSize);
+  const handleTableChange = (
+    pag: TablePaginationConfig,
+    _filters: Record<string, FilterValue | null>,
+    _sorter: SorterResult<Message> | SorterResult<Message>[],
+    _extra: unknown
+  ) => {
+    const current = pag.current ?? pagination.current;
+    const pageSize = pag.pageSize ?? pagination.pageSize;
+    fetchMessages(current, pageSize);
   };
 
   const columns = [

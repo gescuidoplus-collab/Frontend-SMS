@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Layout, Menu, Button } from "antd";
-import { useRouter } from "next/navigation";
+import { Layout, Menu } from "antd";
+import Image from "next/image";
 import LogoutButton from "@/components/LogoutButtom/Index";
 
 const { Header, Content, Sider } = Layout;
@@ -12,7 +12,6 @@ export default function PrivateLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const SIDER_WIDTH = 200;
 
   return (
@@ -39,10 +38,13 @@ export default function PrivateLayout({
             marginTop: 16,
           }}
         >
-          <img
+          <Image
             src="/LogCuidoFam.jpg"
             alt="Logo"
-            style={{ maxHeight: 50, width: "auto", borderRadius: 50 }}
+            width={50}
+            height={50}
+            style={{ borderRadius: 50, height: 50, width: 50, objectFit: "cover" }}
+            priority
           />
           <p style={{ marginLeft: 10, color: "#fff" }}>CuidoFam</p>
         </div>
