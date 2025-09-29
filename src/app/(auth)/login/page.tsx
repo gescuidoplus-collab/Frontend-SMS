@@ -4,12 +4,18 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Form, Input } from "antd";
 import api from "@/lib/axios";
+import Image from "next/image";
+
+interface LoginFormValues {
+  email: string;
+  password: string;
+}
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
       const response = await api.post("/auth/login/", values);
@@ -113,12 +119,12 @@ const LoginPage = () => {
               marginBottom: 32,
             }}
           >
-            <img
+            <Image
               src="/LogCuidoFam.jpg"
               alt="Logo"
+              width={90}
+              height={90}
               style={{
-                width: 90,
-                height: 90,
                 borderRadius: "50%",
                 objectFit: "cover",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.10)",

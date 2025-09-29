@@ -1,12 +1,30 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Tag } from "antd";
+import { Table, Tag, type TablePaginationConfig } from "antd";
 import api from "@/lib/axios";
 import PageHeader from "@/components/PageHeader";
 
+interface Recipient {
+  id: string;
+  fullName: string;
+  phoneNumber: string;
+  message: string;
+}
+interface Message {
+  _id: string;
+  source: string;
+  recipient: Recipient;
+  employe?: Recipient;
+  messageType: string;
+  fileUrl: string;
+  status: string;
+  sentAt?: string;
+  reason?: string;
+}
+
 const DashboardPage = () => {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -38,7 +56,7 @@ const DashboardPage = () => {
     // eslint-disable-next-line
   }, []);
 
-  const handleTableChange = (pag: any) => {
+  const handleTableChange = (pag: TablePaginationConfig) => {
     fetchMessages(pag.current, pag.pageSize);
   };
 
@@ -84,7 +102,7 @@ const DashboardPage = () => {
           failure: "Fallido",
           pending: "Pendiente",
         };
-        let color =
+        const color =
           status === "success"
             ? "green"
             : status === "failure"
@@ -96,7 +114,7 @@ const DashboardPage = () => {
     {
       title: "PDF / Motivo",
       key: "action",
-      render: (_: any, record: any) =>
+      render: (_: unknown, record: Message) =>
         record.status === "success" ? (
           <button
             onClick={() => {
@@ -115,7 +133,7 @@ const DashboardPage = () => {
     },
   ];
 
-  const expandedRowRender = (record: any) => (
+  const expandedRowRender = (record: Message) => (
     <div style={{ padding: "16px 0" }}>
       <div>
         <b>Destinatario principal:</b>
