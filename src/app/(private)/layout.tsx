@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Layout, Menu } from "antd";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "@/components/LogoutButtom/Index";
 
@@ -13,6 +14,15 @@ export default function PrivateLayout({
   children: React.ReactNode;
 }) {
   const SIDER_WIDTH = 200;
+  const router = useRouter()
+
+  const handleMenuClick = (key: string) => {
+    const routes = {
+      "1" : "/dashboard",
+      "2" : "/presupuesto"
+    }
+    router.push(routes[key]);
+  }
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -53,9 +63,10 @@ export default function PrivateLayout({
           theme="dark"
           defaultSelectedKeys={["1"]}
           mode="inline"
-          items={[{ key: "1", label: "Reporte de Mensajes" }]}
+          items={[{ key: "1", label: "Reporte de Mensajes" },{key:"2", label:"Presupuesto"}]}
+          onClick={({ key }) => handleMenuClick(key)}
         />
-        {/* Botón de logout al fondo */}
+
         <div
           style={{
             position: "absolute",
