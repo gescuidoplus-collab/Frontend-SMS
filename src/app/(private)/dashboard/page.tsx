@@ -20,6 +20,9 @@ const DashboardPage = () => {
     sentAt: string;
     status: string;
     fileUrl?: string;
+    pdfUrl?: string;
+    message?: string;
+    message_employe?: string;
     reason?: string;
     recipient?: PersonInfo;
     employe?: PersonInfo; // segundo destinatario cuando messageType === "payRoll"
@@ -126,7 +129,7 @@ const DashboardPage = () => {
         record.status === "success" ? (
           <button
             onClick={() => {
-              window.open(record.fileUrl, "_blank");
+              window.open(record.pdfUrl, "_blank");
             }}
           >
             Descargar archivo
@@ -163,7 +166,7 @@ const DashboardPage = () => {
               marginTop: 4,
             }}
           >
-            {record.recipient?.message || "No disponible"}
+            {record.message || "No disponible"}
           </div>
         </div>
       </div>
@@ -188,7 +191,7 @@ const DashboardPage = () => {
                 marginTop: 4,
               }}
             >
-              {record.employe.message || "No disponible"}
+              {record.message_employe || "No disponible"}
             </div>
           </div>
         </div>
