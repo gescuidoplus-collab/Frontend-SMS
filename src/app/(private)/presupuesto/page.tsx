@@ -337,6 +337,12 @@ const DashboardPage = () => {
     }
     return salidaGlobal;
   };
+
+  const normalizarDecimal = (value: string | undefined): string => {
+    if (!value || typeof value !== "string") return value || "";
+    // Reemplazar comas por puntos
+    return value.replace(/,/g, ".");
+  };
   // ---------------------------------------------------------------
 
   return (
@@ -659,10 +665,18 @@ const DashboardPage = () => {
                 >
                   <Input type="text" style={{ width: "100%" }} step={1} />
                 </Form.Item>
-                <Form.Item label="Cuota CuidoFam" name="cuotaCuidoFam">
+                <Form.Item 
+                  label="Cuota CuidoFam" 
+                  name="cuotaCuidoFam"
+                  normalize={normalizarDecimal}
+                >
                   <Input type="text" style={{ width: "100%" }} step={1} />
                 </Form.Item>
-                <Form.Item label="Seguridad Social" name="seguridadSocial">
+                <Form.Item 
+                  label="Seguridad Social" 
+                  name="seguridadSocial"
+                  normalize={normalizarDecimal}
+                >
                   <Input type="text" style={{ width: "100%" }} step={1} />
                 </Form.Item>
                 
@@ -678,10 +692,18 @@ const DashboardPage = () => {
                     >
                       <Input type="text" style={{ width: "100%" }} step={1} />
                     </Form.Item>
-                    <Form.Item label="Cuota CuidoFam 2" name="cuotaCuidoFam2">
+                    <Form.Item 
+                      label="Cuota CuidoFam 2" 
+                      name="cuotaCuidoFam2"
+                      normalize={normalizarDecimal}
+                    >
                       <Input type="text" style={{ width: "100%" }} step={1} />
                     </Form.Item>
-                    <Form.Item label="Seguridad Social 2" name="seguridadSocial2">
+                    <Form.Item 
+                      label="Seguridad Social 2" 
+                      name="seguridadSocial2"
+                      normalize={normalizarDecimal}
+                    >
                       <Input type="text" style={{ width: "100%" }} step={1} />
                     </Form.Item>
                   </>
