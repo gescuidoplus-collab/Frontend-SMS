@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Table, Tag, type TablePaginationConfig } from "antd";
+import React, { useState } from "react";
+import { Table } from "antd";
 import api from "@/lib/axios";
+import type { Dayjs } from "dayjs";
 import {
   Card,
   Form,
@@ -11,7 +12,6 @@ import {
   Flex,
   Typography,
   Input,
-  Space,
   Select,
   Checkbox,
   Row,
@@ -25,7 +25,6 @@ import PageHeader from "@/components/PageHeader";
 const DashboardPage = () => {
   const [form] = Form.useForm();
   const [modo, setModo] = useState<"precio" | "salario">("precio");
-  const [loading, setLoading] = useState(true);
   const [loadingPDF, setLoadingPDF] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
   const mostrarPresupuesto2 = Form.useWatch("mostrarPresupuesto2", form) || false;
@@ -271,25 +270,26 @@ const DashboardPage = () => {
     { key: "domingo", label: "Domingo" },
   ];
 
-  const rangoValido = (range: any) => {
+  const rangoValido = (range: unknown): range is [Dayjs, Dayjs] => {
     return (
       Array.isArray(range) &&
       range.length === 2 &&
       range[0] &&
       range[1] &&
       typeof range[0]?.isBefore === "function" &&
+      typeof range[1]?.isBefore === "function" &&
       range[0].isBefore(range[1])
     );
   };
 
-  const validarYNormalizarHorarios = (values: any) => {
-    const seleccion: string[] = values?.Dias || [];
+  const validarYNormalizarHorarios = (values: Record<string, unknown>) => {
+    const seleccion = Array.isArray(values?.Dias) ? (values.Dias as string[]) : [];
     if (!Array.isArray(seleccion) || seleccion.length === 0) {
       throw new Error("Selecciona al menos un día.");
     }
 
     // Modo por-día (si existe 'horarios')
-    const horariosPorDia = values?.horarios;
+    const horariosPorDia = values?.horarios as Record<string, unknown> | undefined;
     if (horariosPorDia && typeof horariosPorDia === "object") {
       const salida: Record<string, { inicio: string; fin: string } | null> = {};
       for (const { key } of DIAS) {
@@ -312,8 +312,8 @@ const DashboardPage = () => {
     }
 
     // Modo global (form actual): inicio/fin únicos
-    const inicio = values?.inicio;
-    const fin = values?.final;
+    const inicio = values?.inicio as Dayjs | undefined;
+    const fin = values?.final as Dayjs | undefined;
     if (
       !inicio ||
       !fin ||
@@ -513,12 +513,11 @@ const DashboardPage = () => {
                     setCotizacionTotal(0);
                     setIvaPrecioServicio(0);
                     setCosteTortalEmpleador(0);
-                  } catch (err: any) {
+                  } catch (err) {
+                    const errorMessage = err instanceof Error ? err.message : "Revisa los horarios seleccionados.";
                     message.destroy("generating-pdf");
                     setLoadingPDF(false);
-                    message.error(
-                      err?.message || "Revisa los horarios seleccionados."
-                    );
+                    message.error(errorMessage);
                   }
                 }}
               >
