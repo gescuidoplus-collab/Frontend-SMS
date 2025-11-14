@@ -5,25 +5,27 @@ import { Table, Tag, type TablePaginationConfig } from "antd";
 import api from "@/lib/axios";
 import PageHeader from "@/components/PageHeader";
 
-interface Recipient {
-  id: string;
-  fullName: string;
-  phoneNumber: string;
-  message: string;
-}
-interface Message {
-  _id: string;
-  source: string;
-  recipient: Recipient;
-  employe?: Recipient;
-  messageType: string;
-  fileUrl: string;
-  status: string;
-  sentAt?: string;
-  reason?: string;
-}
-
 const DashboardPage = () => {
+  interface PersonInfo {
+    fullName?: string;
+    phoneNumber?: string;
+    message?: string;
+  }
+
+  interface Message {
+    _id?: string;
+    messageType: string;
+    sentAt: string;
+    status: string;
+    fileUrl?: string;
+    pdfUrl?: string;
+    message?: string;
+    message_employe?: string;
+    reason?: string;
+    recipient?: PersonInfo;
+    employe?: PersonInfo; // segundo destinatario cuando messageType === "payRoll"
+    [key: string]: unknown;
+  }
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -118,7 +120,7 @@ const DashboardPage = () => {
         record.status === "success" ? (
           <button
             onClick={() => {
-              window.open(record.fileUrl, "_blank");
+              window.open(record.pdfUrl, "_blank");
             }}
           >
             Descargar archivo
@@ -155,7 +157,7 @@ const DashboardPage = () => {
               marginTop: 4,
             }}
           >
-            {record.recipient?.message || "No disponible"}
+            {record.message || "No disponible"}
           </div>
         </div>
       </div>
@@ -180,7 +182,7 @@ const DashboardPage = () => {
                 marginTop: 4,
               }}
             >
-              {record.employe.message || "No disponible"}
+              {record.message_employe || "No disponible"}
             </div>
           </div>
         </div>
