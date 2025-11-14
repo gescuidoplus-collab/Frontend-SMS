@@ -1,15 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button, Form, Input } from "antd";
 import api from "@/lib/axios";
+import Image from "next/image";
 
 interface LoginFormValues {
-  username: string;
+  email: string;
   password: string;
-  [key: string]: unknown;
 }
 
 const LoginPage = () => {
@@ -40,16 +39,21 @@ const LoginPage = () => {
         background: "#181C23",
       }}
     >
-      {/* Sol */}
+      {/* Sol SVG en la esquina superior derecha */}
       <svg
         width={190}
         height={190}
         viewBox="0 0 180 180"
-        style={{ position: "absolute", top: 50, right: 50, zIndex: 2 }}
+        style={{
+          position: "absolute",
+          top: 50,
+          right: 50,
+          zIndex: 2,
+        }}
       >
         <circle cx="90" cy="90" r="90" fill="#FFD43B" />
       </svg>
-      {/* Olas */}
+      {/* Fondo animado de ondas */}
       <svg
         style={{
           position: "absolute",
@@ -69,11 +73,23 @@ const LoginPage = () => {
           </linearGradient>
         </defs>
         <path
+          d="M0,160 Q360,240 720,160 T1440,160 V320 H0 Z"
           fill="url(#waveGradient)"
-          d="M0,192L48,181.3C96,171,192,149,288,154.7C384,160,480,192,576,197.3C672,203,768,181,864,181.3C960,181,1056,203,1152,213.3C1248,224,1344,224,1392,224L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-        />
+        >
+          <animate
+            attributeName="d"
+            dur="6s"
+            repeatCount="indefinite"
+            values="
+              M0,160 Q360,240 720,160 T1440,160 V320 H0 Z;
+              M0,180 Q360,120 720,200 T1440,180 V320 H0 Z;
+              M0,160 Q360,240 720,160 T1440,160 V320 H0 Z
+            "
+          />
+        </path>
       </svg>
-      {/* Contenido */}
+
+      {/* Contenido centrado */}
       <div
         style={{
           position: "relative",
@@ -96,7 +112,13 @@ const LoginPage = () => {
             alignItems: "center",
           }}
         >
-          <div style={{ marginBottom: 32 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: 32,
+            }}
+          >
             <Image
               src="/LogCuidoFam.jpg"
               alt="Logo"
@@ -110,19 +132,14 @@ const LoginPage = () => {
               }}
             />
           </div>
-          <Form
-            layout="vertical"
-            onFinish={onFinish}
-            style={{ width: "100%" }}
-            disabled={loading}
-          >
+          <Form onFinish={onFinish} style={{ width: "100%" }}>
             <Form.Item
-              name="username"
+              name="email"
               rules={[
-                { required: true, message: "Por favor ingresa tu usuario!" },
+                { required: true, message: "Por favor ingresa tu email!" },
               ]}
             >
-              <Input placeholder="Usuario" size="large" />
+              <Input placeholder="Email" size="large" />
             </Form.Item>
             <Form.Item
               name="password"
