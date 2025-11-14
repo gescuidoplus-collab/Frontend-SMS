@@ -17,7 +17,7 @@ export default function PrivateLayout({
   const router = useRouter()
 
   const handleMenuClick = (key: string) => {
-    const routes = {
+    const routes: Record<string, string> = {
       "1" : "/dashboard",
       "2" : "/presupuesto"
     }
