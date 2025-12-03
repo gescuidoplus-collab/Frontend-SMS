@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { Table } from "antd";
+import React, { useEffect, useState } from "react";
+import { Table, Tag, type TablePaginationConfig } from "antd";
+import { PlusOutlined,  DownloadOutlined } from '@ant-design/icons';
 import api from "@/lib/axios";
-import type { Dayjs } from "dayjs";
 import {
   Card,
   Form,
@@ -12,23 +12,26 @@ import {
   Flex,
   Typography,
   Input,
+  Space,
   Select,
   Checkbox,
   Row,
   Col,
   TimePicker,
   message,
+  Divider,
 } from "antd";
 const { Title, Text } = Typography;
 import PageHeader from "@/components/PageHeader";
 
 const DashboardPage = () => {
   const [form] = Form.useForm();
-  const [modo, setModo] = useState<"precio" | "salario">("precio");
   const [loadingPDF, setLoadingPDF] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
-  const mostrarPresupuesto2 = Form.useWatch("mostrarPresupuesto2", form) || false;
-  
+  const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
+  const [resultadosActuales, setResultadosActuales] = useState(null);
+  const [presupuestos, setPresupuestos] = useState([]);
+  const [desgloses, setDesgloses] = useState({});
 
   //VARIABLES INPUT
   const [precioHora, setPrecioHora] = useState(0);
@@ -157,9 +160,7 @@ const DashboardPage = () => {
     setHorasTotalesMensuales(totalHoras);
 
     // Usar salarioNetoManual si se proporciona, sino calcular desde precioHora
-    const netoMensual = salarioNetoManual > 0 
-      ? salarioNetoManual 
-      : precioHora * totalHoras;
+    const netoMensual = salarioNetoManual > 0 ? salarioNetoManual : precioHora * totalHoras;
     setSalarioNetoMensual(netoMensual);
 
     const valoresTabla = determinarTramo(netoMensual);
@@ -171,7 +172,7 @@ const DashboardPage = () => {
     const desempleoCalc = valoresTabla.baseCotizacion * 0.0155;
     const formacionProfesionalCalc = valoresTabla.baseCotizacion * 0.0012;
     const cotizacionesEmpleadosCalc = valoresTabla.baseCotizacion * 0.0637;
-    
+
     setContingenciasComunes(contingenciasComunesCalc);
     setDesempleo(desempleoCalc);
     setFormacionProfesional(formacionProfesionalCalc);
@@ -189,6 +190,54 @@ const DashboardPage = () => {
     const costeTotalEmpleador =
       netoMensual + valoresTabla.total + (precioServicio + precioIvaDescuento);
     setCosteTortalEmpleador(costeTotalEmpleador);
+
+    const resultadosFinales = {
+      sueldoNeto: Number(netoMensual.toFixed(2)),
+      cuotaCuidoFam: Number((precioServicio + precioIvaDescuento).toFixed(2)),
+      seguridadSocial: Number(valoresTabla.total.toFixed(2)),
+      totalEmpleador: Number(costeTotalEmpleador.toFixed(2)),
+    };
+
+    setResultadosActuales(resultadosFinales);
+  };
+
+  const agregarPresupuesto = () => {
+    if (!resultadosActuales) {
+      message.error("Primero debes calcular los resultados");
+      return;
+    }
+
+    const nuevoPresupuesto = {
+      id: Date.now(),
+      resultados: resultadosActuales,
+    };
+
+    setPresupuestos([...presupuestos, nuevoPresupuesto]);
+    limpiarFormulario();
+  };
+
+  const limpiarFormulario = () => {
+    /* 
+    setPrecioHora(0);
+    setDiasTrabajo(0);
+    setHorasDia(0);
+    setSemanasAlMes(0);
+    setSalarioNetoManual(0);
+    setPrecioServicio(0); */
+    setResultadosActuales(null);
+    setHorasTotalesMensuales(0);
+    setSalarioNetoMensual(0);
+    setBaseCotizacion(0);
+    setTramoSalarial(0);
+    setCotizacionesEmpleados(0);
+    setContingenciasComunes(0);
+    setDesempleo(0);
+    setFormacionProfesional(0);
+    setBrutoMensual(0);
+    setCotizacionEmpleador(0);
+    setCotizacionTotal(0);
+    setIvaPrecioServicio(0);
+    setCosteTortalEmpleador(0);
   };
 
   const determinarTramo = (salario: number) => {
@@ -270,26 +319,25 @@ const DashboardPage = () => {
     { key: "domingo", label: "Domingo" },
   ];
 
-  const rangoValido = (range: unknown): range is [Dayjs, Dayjs] => {
+  const rangoValido = (range: any) => {
     return (
       Array.isArray(range) &&
       range.length === 2 &&
       range[0] &&
       range[1] &&
       typeof range[0]?.isBefore === "function" &&
-      typeof range[1]?.isBefore === "function" &&
       range[0].isBefore(range[1])
     );
   };
 
-  const validarYNormalizarHorarios = (values: Record<string, unknown>) => {
-    const seleccion = Array.isArray(values?.Dias) ? (values.Dias as string[]) : [];
+  const validarYNormalizarHorarios = (values: any) => {
+    const seleccion: string[] = values?.Dias || [];
     if (!Array.isArray(seleccion) || seleccion.length === 0) {
-      throw new Error("Selecciona al menos un día.");
+      return {};
     }
 
     // Modo por-día (si existe 'horarios')
-    const horariosPorDia = values?.horarios as Record<string, unknown> | undefined;
+    const horariosPorDia = values?.horarios;
     if (horariosPorDia && typeof horariosPorDia === "object") {
       const salida: Record<string, { inicio: string; fin: string } | null> = {};
       for (const { key } of DIAS) {
@@ -312,8 +360,8 @@ const DashboardPage = () => {
     }
 
     // Modo global (form actual): inicio/fin únicos
-    const inicio = values?.inicio as Dayjs | undefined;
-    const fin = values?.final as Dayjs | undefined;
+    const inicio = values?.inicio;
+    const fin = values?.final;
     if (
       !inicio ||
       !fin ||
@@ -349,16 +397,12 @@ const DashboardPage = () => {
     <>
       <PageHeader
         title="Calculadora de Sueldos"
-        description="Convenio Empleadas de Hogar 2025"
+        description="Convenio Empleadas de Hogar"
       />
 
       <div style={{ padding: 24 }}>
         <Button.Group style={{ marginBottom: 24 }} size="middle">
-          <Button
-            type={modo === "precio" ? "primary" : "default"}
-            size="large"
-            onClick={() => setModo("precio")}
-          >
+          <Button type="primary" size="large">
             Calcular desde precio/hora
           </Button>
         </Button.Group>
@@ -366,20 +410,19 @@ const DashboardPage = () => {
         <Flex gap={24} align="flex-start">
           {/* Columna Izquierda - Formulario */}
           <Card style={{ flex: 1, maxWidth: 550 }}>
+            {/*Calculadora */}
             <Card>
               <Flex vertical gap={16}>
-                {modo === "precio" && (
-                  <div>
-                    <Text>Precio por hora (€)</Text>
-                    <InputNumber
-                      style={{ width: "100%", marginTop: 8 }}
-                      min={0}
-                      step={0.1}
-                      value={precioHora}
-                      onChange={(value) => setPrecioHora(value || 0)}
-                    />
-                  </div>
-                )}
+                <div>
+                  <Text>Precio por hora (€)</Text>
+                  <InputNumber
+                    style={{ width: "100%", marginTop: 8 }}
+                    min={0}
+                    step={0.1}
+                    value={precioHora}
+                    onChange={(value) => setPrecioHora(value || 0)}
+                  />
+                </div>
 
                 <div>
                   <Text>Días de trabajo a la semana</Text>
@@ -440,21 +483,69 @@ const DashboardPage = () => {
                   />
                 </div>
 
-                <Button
-                  style={{
-                    background: "#6366f2",
-                    color: "#fff",
-                    fontWeight: "bold",
-                  }}
-                  block
-                  size="large"
-                  onClick={calculateData}
-                >
-                  Calcular
-                </Button>
+                <Space>
+                  <Button
+                    style={{
+                      background: "#6366f2",
+                      color: "#fff",
+                      fontWeight: "bold",
+                    }}
+                    size="large"
+                    onClick={calculateData}
+                  >
+                    Calcular
+                  </Button>
+
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<PlusOutlined />}
+                    onClick={agregarPresupuesto}
+                    disabled={!resultadosActuales}
+                  >
+                    {"Agregar Presupuesto"}
+                  </Button>
+                </Space>
               </Flex>
             </Card>
 
+            {presupuestos.length > 0 && (
+              <Card
+                title={`Presupuestos Agregados (${presupuestos.length})`}
+                style={{ marginBottom: 16, marginTop: 10 }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {presupuestos.map((p, index) => (
+                    <Card
+                      key={p.id}
+                      size="small"
+                      style={{ background: "#f5f5f5" }}
+                    >
+                      <Text strong>Presupuesto {index + 1}</Text>
+                      <br />
+                      <Text type="secondary">
+                        Cuota CuidoFam: {p.resultados.cuotaCuidoFam.toFixed(2)}€
+                      </Text>
+                      <br />
+                      <Text type="secondary">
+                        Salario Neto: {p.resultados.sueldoNeto.toFixed(2)}€
+                      </Text>
+                      <br />
+                      <Text type="secondary">
+                        Seguridad Social:{" "}
+                        {p.resultados.seguridadSocial.toFixed(2)}€
+                      </Text>
+                      <br />
+                      <Text strong>
+                        Coste Total: {p.resultados.totalEmpleador.toFixed(2)}€
+                      </Text>
+                    </Card>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
+            {/*Formulario*/}
             <Card style={{ margin: "10px 0", background: "#f5f5f5" }}>
               <Form
                 form={form}
@@ -462,14 +553,21 @@ const DashboardPage = () => {
                 initialValues={{}}
                 onFinish={async (values) => {
                   try {
+                    setLoadingPDF(true);
                     const horariosNormalizados =
                       validarYNormalizarHorarios(values);
                     const payload = {
                       ...values,
                       horarios: horariosNormalizados,
                       salarioNetoMensual,
+                      presupuestos: presupuestos.map((p, index) => ({
+                        numero: index + 1,
+                        resultados: p.resultados,
+                        desglose: desgloses[p.id] || "",
+                      })),
+                      Dias: values.Dias || [],
                     };
-                    console.log("Formulario OK:", payload);
+                    //console.log("Formulario OK:", payload);
 
                     const response = await api.post("/generate-pdf", payload, {
                       responseType: "blob", // IMPORTANTE: Para recibir archivos binarios
@@ -480,8 +578,8 @@ const DashboardPage = () => {
                     const url = window.URL.createObjectURL(blob);
                     const link = document.createElement("a");
                     link.href = url;
-                    link.download = `contrato-${
-                      values.nameCuidador || "empleado"
+                    link.download = `Presupuesto-${
+                      values.nameContrato || ""
                     }.pdf`;
                     document.body.appendChild(link);
                     link.click();
@@ -490,7 +588,7 @@ const DashboardPage = () => {
                     message.destroy("generating-pdf");
                     setLoadingPDF(false);
                     message.success("PDF generado correctamente");
-                    
+
                     // Resetear todos los campos solo si el PDF se genera correctamente
                     form.resetFields();
                     setPrecioHora(0);
@@ -513,11 +611,16 @@ const DashboardPage = () => {
                     setCotizacionTotal(0);
                     setIvaPrecioServicio(0);
                     setCosteTortalEmpleador(0);
-                  } catch (err) {
-                    const errorMessage = err instanceof Error ? err.message : "Revisa los horarios seleccionados.";
+                    setPresupuestos([]);
+                    setDesgloses({});
+                  } catch (err: any) {
                     message.destroy("generating-pdf");
                     setLoadingPDF(false);
-                    message.error(errorMessage);
+                    message.error(
+                      err?.message || "Revisa los horarios seleccionados."
+                    );
+                  }finally{
+                    setLoadingPDF(false)
                   }
                 }}
               >
@@ -525,11 +628,12 @@ const DashboardPage = () => {
                   <Form.Item
                     label="Nombre de la persona que hace el contrato "
                     name="nameContrato"
+                    rules={[{ required: true,message:"*Campo Obligatorio"}]}
                   >
                     <Input type="text" style={{ width: "100%" }} step={1} />
                   </Form.Item>
                 </>
-                <Form.Item label="Nombre del Pueblo" name="NombrePueblo">
+                <Form.Item label="Nombre del Pueblo" name="NombrePueblo" rules={[{ required: true,message:"*Campo Obligatorio"}]}>
                   <Input
                     type="text"
                     style={{ width: "100%" }}
@@ -538,7 +642,7 @@ const DashboardPage = () => {
                     step={1}
                   />
                 </Form.Item>
-                <Form.Item name="Servicio" label="Servicio">
+                <Form.Item name="Servicio" label="Provincia del Servicio" rules={[{ required: true,message:"*Campo Obligatorio"}]}>
                   <Select
                     placeholder=""
                     options={[
@@ -547,10 +651,9 @@ const DashboardPage = () => {
                     ]}
                   />
                 </Form.Item>
-                <Form.Item name="TipoServicio" label="Tipo de Servicio">
+                <Form.Item name="TipoServicio" label="Tipo de Servicio" rules={[{ required: true,message:"*Campo Obligatorio"}]}>
                   <Select
                     mode="multiple"
-                    placeholder="Tipo de Servicio"
                     options={[
                       { value: "0", label: "--" },
                       { value: "Externa", label: "Externa" },
@@ -566,16 +669,27 @@ const DashboardPage = () => {
                     ]}
                   />
                 </Form.Item>
-                <Form.Item label="Nombre del Cuidador" name="nameCuidador">
-                  <Input
-                    type="text"
-                    style={{ width: "100%" }}
-                    min={0}
-                    max={7}
-                    step={1}
-                  />
+                <Form.Item name="horarioConvenir" valuePropName="checked">
+                  <Checkbox>¿Quieres enviar un horario a convenir?</Checkbox>
                 </Form.Item>
-                <Form.Item name="Dias" label="Dias">
+
+                {horarioConvenir && (
+                  <>
+                    <Form.Item
+                      label="Horario a Convenir"
+                      name="horario_Convenir"
+                      rules={[{ required: true,message:"*Campo Obligatorio"}]}
+                    >
+                      <Input type="text" style={{ width: "100%" }} step={1} />
+                    </Form.Item>
+                  </>
+                )}
+
+                <Form.Item
+                  name="Dias"
+                  label="Dias"
+                  rules={[{ required: false }]}
+                >
                   <Checkbox.Group>
                     <Row>
                       <Col span={8}>
@@ -636,10 +750,11 @@ const DashboardPage = () => {
                           name={["horarios", key]}
                           rules={[
                             {
+                              required: false,
                               validator: async (_, value) => {
                                 if (!diasSeleccionados.includes(key))
                                   return Promise.resolve();
-                                if (!rangoValido(value)) {
+                                if (value && !rangoValido(value)) {
                                   return Promise.reject(
                                     new Error("Selecciona un rango válido")
                                   );
@@ -658,62 +773,33 @@ const DashboardPage = () => {
                     );
                   })}
                 </Row>
-                <Form.Item
-                  label="Desglose del presupuesto 1"
-                  name="desglocePresupuesto"
-                >
-                  <Input type="text" style={{ width: "100%" }} step={1} />
-                </Form.Item>
-                <Form.Item 
-                  label="Cuota CuidoFam" 
-                  name="cuotaCuidoFam"
-                  normalize={normalizarDecimal}
-                >
-                  <Input type="text" style={{ width: "100%" }} step={1} />
-                </Form.Item>
-                <Form.Item 
-                  label="Seguridad Social" 
-                  name="seguridadSocial"
-                  normalize={normalizarDecimal}
-                >
-                  <Input type="text" style={{ width: "100%" }} step={1} />
-                </Form.Item>
-                
-                <Form.Item name="mostrarPresupuesto2" valuePropName="checked">
-                  <Checkbox>¿Quieres enviar un presupuesto 2?</Checkbox>
-                </Form.Item>
+                <Divider>Desgloses de Presupuestos</Divider>
 
-                {mostrarPresupuesto2 && (
-                  <>
-                    <Form.Item
-                      label="Desglose del presupuesto 2"
-                      name="desglocePresupuesto2"
-                    >
-                      <Input type="text" style={{ width: "100%" }} step={1} />
-                    </Form.Item>
-                    <Form.Item 
-                      label="Cuota CuidoFam 2" 
-                      name="cuotaCuidoFam2"
-                      normalize={normalizarDecimal}
-                    >
-                      <Input type="text" style={{ width: "100%" }} step={1} />
-                    </Form.Item>
-                    <Form.Item 
-                      label="Seguridad Social 2" 
-                      name="seguridadSocial2"
-                      normalize={normalizarDecimal}
-                    >
-                      <Input type="text" style={{ width: "100%" }} step={1} />
-                    </Form.Item>
-                  </>
-                )}
+                {presupuestos.map((p, index) => (
+                  <div key={p.id}>
+                    <Text>Desglose del Presupuesto {index + 1}</Text>
+                    <Input
+                      style={{ marginTop: 8 }}
+                      placeholder={`Describe el presupuesto ${index + 1}`}
+                      value={desgloses[p.id] || ""}
+                      onChange={(e) =>
+                        setDesgloses({
+                          ...desgloses,
+                          [p.id]: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                ))}
                 <Form.Item>
                   <Button
                     style={{
                       background: "#6366f2",
                       color: "#fff",
                       fontWeight: "bold",
+                      marginTop: "10px",
                     }}
+                    icon= {<DownloadOutlined/>}
                     htmlType="submit"
                     block
                     size="large"
@@ -735,7 +821,9 @@ const DashboardPage = () => {
                   {horasTotalesMensuales.toFixed(1)} horas
                 </Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {`${diasTrabajo} dias x ${horasDia} horas x ${semanasAlMes} semanas = ${horasTotalesMensuales.toFixed(1)} horas`}
+                  {`${diasTrabajo} dias x ${horasDia} horas x ${semanasAlMes} semanas = ${horasTotalesMensuales.toFixed(
+                    1
+                  )} horas`}
                 </Text>
               </Card>
               <Card size="small" style={{ borderLeft: "4px solid #6366f2" }}>
@@ -744,9 +832,11 @@ const DashboardPage = () => {
                   {salarioNetoMensual.toFixed(2)}€
                 </Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {salarioNetoManual > 0 
+                  {salarioNetoManual > 0
                     ? `Salario neto manual: ${salarioNetoMensual.toFixed(2)}€`
-                    : `${precioHora}€/hora × ${horasTotalesMensuales.toFixed(1)} horas = ${salarioNetoMensual.toFixed(2)}€`}
+                    : `${precioHora}€/hora × ${horasTotalesMensuales.toFixed(
+                        1
+                      )} horas = ${salarioNetoMensual.toFixed(2)}€`}
                 </Text>
               </Card>
               <Card size="small" style={{ borderLeft: "4px solid #6366f2" }}>
@@ -768,13 +858,17 @@ const DashboardPage = () => {
                 </Title>
                 <div style={{ marginTop: 8, fontSize: 12 }}>
                   <Text type="secondary">
-                    Contingencias comunes (4,70%): {contingenciasComunes.toFixed(2)}€
+                    Contingencias comunes (4,70%):{" "}
+                    {contingenciasComunes.toFixed(2)}€
                   </Text>
                   <br />
-                  <Text type="secondary">Desempleo (1,55%): {desempleo.toFixed(2)}€</Text>
+                  <Text type="secondary">
+                    Desempleo (1,55%): {desempleo.toFixed(2)}€
+                  </Text>
                   <br />
                   <Text type="secondary">
-                    Formación profesional (0,12%): {formacionProfesional.toFixed(2)}€
+                    Formación profesional (0,12%):{" "}
+                    {formacionProfesional.toFixed(2)}€
                   </Text>
                 </div>
               </Card>
@@ -784,8 +878,9 @@ const DashboardPage = () => {
                   {salarioBrutoMensual.toFixed(2)}€
                 </Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {salarioNetoMensual.toFixed(2)}€ (neto) + {cotizacionesEmpleados.toFixed(2)}€ (cotizacion
-                  empleado) = {salarioBrutoMensual.toFixed(2)}€
+                  {salarioNetoMensual.toFixed(2)}€ (neto) +{" "}
+                  {cotizacionesEmpleados.toFixed(2)}€ (cotizacion empleado) ={" "}
+                  {salarioBrutoMensual.toFixed(2)}€
                 </Text>
               </Card>
               <Card size="small" style={{ borderLeft: "4px solid #6366f2" }}>
@@ -824,15 +919,17 @@ const DashboardPage = () => {
                   {costeTotalEmpleador.toFixed(2)}€
                 </Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {salarioNetoMensual.toFixed(2)}€ (neto) + {cotizacionTotal.toFixed(2)}€ (cotización
-                  total) + {(precioServicio + ivaPrecioServicio).toFixed(2)}€ (servicio+IVA)
-                  = {costeTotalEmpleador.toFixed(2)}€
+                  {salarioNetoMensual.toFixed(2)}€ (neto) +{" "}
+                  {cotizacionTotal.toFixed(2)}€ (cotización total) +{" "}
+                  {(precioServicio + ivaPrecioServicio).toFixed(2)}€
+                  (servicio+IVA) = {costeTotalEmpleador.toFixed(2)}€
                 </Text>
               </Card>
             </Flex>
           </Card>
         </Flex>
 
+        {/*Tabla de Precios*/}
         <Card style={{ marginTop: "50px" }}>
           <Table
             //style={{ marginTop: "50px" }}
