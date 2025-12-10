@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Form, Input } from "antd";
+import { Button, Form, Input, message } from "antd";
+import { useAuth } from "@/components/AuthProvider";
 import api from "@/lib/axios";
 import Image from "next/image";
 
@@ -14,16 +15,27 @@ interface LoginFormValues {
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
       const response = await api.post("/auth/login/", values);
-      localStorage.setItem("token", response?.data?.accessToken);
-      document.cookie = `token=${response?.data?.accessToken}; path=/;`;
-      router.push("/dashboard");
-    } catch (error) {
+      
+      // Usar el contexto de autenticación para gestionar el token
+      if (response?.data?.accessToken) {
+        // Usar la función de login del contexto Auth
+        login(response.data.accessToken);
+        // El redirect lo maneja el contexto de Auth
+      } else {
+        throw new Error("No se recibió un token válido");
+      }
+    } catch (error: any) {
       console.error("Login failed:", error);
+      // Mostrar mensaje de error
+      const errorMessage = error?.response?.data?.error || "Error al iniciar sesión. Verifica tus credenciales.";
+      // Si usas una librería para notificaciones como message de Ant Design
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }

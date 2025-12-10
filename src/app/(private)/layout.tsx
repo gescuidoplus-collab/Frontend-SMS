@@ -5,6 +5,7 @@ import { Layout, Menu } from "antd";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "@/components/LogoutButtom/Index";
+import ClientLayout from "@/components/ClientLayout";
 
 const { Header, Content, Sider } = Layout;
 
@@ -25,7 +26,8 @@ export default function PrivateLayout({
   }
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <ClientLayout>
+      <Layout style={{ minHeight: "100vh" }}>
       <Sider
         width={SIDER_WIDTH}
         style={{
@@ -94,5 +96,6 @@ export default function PrivateLayout({
         <Content style={{ margin: "16px" }}>{children}</Content>
       </Layout>
     </Layout>
+    </ClientLayout>
   );
 }

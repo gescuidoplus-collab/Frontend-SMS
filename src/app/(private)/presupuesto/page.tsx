@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Table, Tag, type TablePaginationConfig } from "antd";
+import React, { useState } from "react";
+import { Table } from "antd";
 import { PlusOutlined,  DownloadOutlined } from '@ant-design/icons';
 import api from "@/lib/axios";
 import {
@@ -29,9 +29,21 @@ const DashboardPage = () => {
   const [loadingPDF, setLoadingPDF] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
   const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
-  const [resultadosActuales, setResultadosActuales] = useState(null);
-  const [presupuestos, setPresupuestos] = useState([]);
-  const [desgloses, setDesgloses] = useState({});
+  type ResultadosType = {
+    sueldoNeto: number;
+    cuotaCuidoFam: number;
+    seguridadSocial: number;
+    totalEmpleador: number;
+  } | null;
+
+  type PresupuestoType = {
+    id: number;
+    resultados: ResultadosType;
+  };
+
+  const [resultadosActuales, setResultadosActuales] = useState<ResultadosType>(null);
+  const [presupuestos, setPresupuestos] = useState<PresupuestoType[]>([]);
+  const [desgloses, setDesgloses] = useState<Record<number, string>>({});
 
   //VARIABLES INPUT
   const [precioHora, setPrecioHora] = useState(0);
@@ -386,6 +398,7 @@ const DashboardPage = () => {
     return salidaGlobal;
   };
 
+  // Función para normalizar valores decimales
   const normalizarDecimal = (value: string | undefined): string => {
     if (!value || typeof value !== "string") return value || "";
     // Reemplazar comas por puntos
@@ -524,20 +537,20 @@ const DashboardPage = () => {
                       <Text strong>Presupuesto {index + 1}</Text>
                       <br />
                       <Text type="secondary">
-                        Cuota CuidoFam: {p.resultados.cuotaCuidoFam.toFixed(2)}€
+                        Cuota CuidoFam: {p.resultados?.cuotaCuidoFam?.toFixed(2) || '0.00'}€
                       </Text>
                       <br />
                       <Text type="secondary">
-                        Salario Neto: {p.resultados.sueldoNeto.toFixed(2)}€
+                        Salario Neto: {p.resultados?.sueldoNeto?.toFixed(2) || '0.00'}€
                       </Text>
                       <br />
                       <Text type="secondary">
                         Seguridad Social:{" "}
-                        {p.resultados.seguridadSocial.toFixed(2)}€
+                        {p.resultados?.seguridadSocial?.toFixed(2) || '0.00'}€
                       </Text>
                       <br />
                       <Text strong>
-                        Coste Total: {p.resultados.totalEmpleador.toFixed(2)}€
+                        Coste Total: {p.resultados?.totalEmpleador?.toFixed(2) || '0.00'}€
                       </Text>
                     </Card>
                   ))}
