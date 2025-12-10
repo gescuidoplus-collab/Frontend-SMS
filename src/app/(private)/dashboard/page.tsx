@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Tag } from "antd";
-import type { TablePaginationConfig } from "antd/es/table";
-import type { FilterValue, SorterResult } from "antd/es/table/interface";
+import { Table, Tag, type TablePaginationConfig } from "antd";
 import api from "@/lib/axios";
 import PageHeader from "@/components/PageHeader";
 
@@ -60,15 +58,8 @@ const DashboardPage = () => {
     // eslint-disable-next-line
   }, []);
 
-  const handleTableChange = (
-    pag: TablePaginationConfig,
-    _filters: Record<string, FilterValue | null>,
-    _sorter: SorterResult<Message> | SorterResult<Message>[],
-    _extra: unknown
-  ) => {
-    const current = pag.current ?? pagination.current;
-    const pageSize = pag.pageSize ?? pagination.pageSize;
-    fetchMessages(current, pageSize);
+  const handleTableChange = (pag: TablePaginationConfig) => {
+    fetchMessages(pag.current, pag.pageSize);
   };
 
   const columns = [
@@ -113,7 +104,7 @@ const DashboardPage = () => {
           failure: "Fallido",
           pending: "Pendiente",
         };
-  const color =
+        const color =
           status === "success"
             ? "green"
             : status === "failure"
@@ -125,7 +116,7 @@ const DashboardPage = () => {
     {
       title: "PDF / Motivo",
       key: "action",
-  render: (_: unknown, record: Message) =>
+      render: (_: unknown, record: Message) =>
         record.status === "success" ? (
           <button
             onClick={() => {

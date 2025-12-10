@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://backend-sms-three.vercel.app/api/v1",
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "https://backend-sms-three.vercel.app/api/v1",
 });
 
 api.interceptors.request.use(
@@ -18,4 +18,3 @@ api.interceptors.request.use(
 );
 
 export default api;
-
