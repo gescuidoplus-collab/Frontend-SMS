@@ -420,8 +420,6 @@ const DashboardPage = () => {
     return salidaGlobal;
   };
 
-
-console.log(".")
   return (
     <>
       <PageHeader
