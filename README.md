@@ -55,7 +55,10 @@ Actualiza la sección `images.remotePatterns` en `next.config.ts` si tu API u ot
 - `optimizePackageImports` para antd (Next 15 / Agosto 2025) reduce el bundle.
 - React Strict Mode habilitado.
 
+### Actualizaciones de Seguridad
+- 10/12/2025: Actualizada la versión de Next.js de 15.4.4 a 15.5.7 para solucionar vulnerabilidad CVE-2025-66478
+- Se añadieron cabeceras de seguridad adicionales (X-Content-Type-Options, X-XSS-Protection, X-Frame-Options)
+
 ### Troubleshooting
 - Error 403 a la API: confirma que `NEXT_PUBLIC_API_BASE_URL` apunta al host correcto y que CORS en backend permite origen del dominio Vercel.
 - CSP bloquea recursos: revisa consola del navegador y añade el dominio faltante en la cadena `Content-Security-Policy`.
-.
