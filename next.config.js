@@ -1,5 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Desactivar la generación de archivos de traza para evitar errores EPERM
+  trailingSlash: true,
+  generateBuildId: () => 'build-' + Date.now(),
+  productionBrowserSourceMaps: false,
+  
+  // Configuración de seguridad para prevenir vulnerabilidades
+  headers: async () => [
+    {
+      source: '/(.*)',
+      headers: [
+        {
+          key: 'X-Content-Type-Options',
+          value: 'nosniff',
+        },
+        {
+          key: 'X-XSS-Protection',
+          value: '1; mode=block',
+        },
+        {
+          key: 'X-Frame-Options',
+          value: 'SAMEORIGIN',
+        },
+      ],
+    },
+  ],
   reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
