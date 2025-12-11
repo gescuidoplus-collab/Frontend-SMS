@@ -1,7 +1,7 @@
 "use client";
 
-import React, {  useState } from "react";
-import { Table } from "antd";
+import React, { useEffect, useState } from "react";
+import { Table, Tag, type TablePaginationConfig } from "antd";
 import { PlusOutlined,  DownloadOutlined } from '@ant-design/icons';
 import api from "@/lib/axios";
 import {
@@ -29,29 +29,9 @@ const DashboardPage = () => {
   const [loadingPDF, setLoadingPDF] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
   const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
-  // Definir tipo para resultados
-  type ResultadosType = {
-    sueldoNeto: number;
-    cuotaCuidoFam: number;
-    seguridadSocial: number;
-    totalEmpleador: number;
-  } | null;
-
-  const [resultadosActuales, setResultadosActuales] = useState<ResultadosType>(null);
-  // Definir tipo para presupuestos
-  type PresupuestoType = {
-    id: number;
-    resultados: {
-      sueldoNeto: number;
-      cuotaCuidoFam: number;
-      seguridadSocial: number;
-      totalEmpleador: number;
-    };
-  };
-
-  const [presupuestos, setPresupuestos] = useState<PresupuestoType[]>([]);
-  // Definir tipo para desgloses - sólo valores string para los inputs
-  const [desgloses, setDesgloses] = useState<Record<number, string>>({});
+  const [resultadosActuales, setResultadosActuales] = useState(null);
+  const [presupuestos, setPresupuestos] = useState([]);
+  const [desgloses, setDesgloses] = useState({});
 
   //VARIABLES INPUT
   const [precioHora, setPrecioHora] = useState(0);
@@ -339,13 +319,7 @@ const DashboardPage = () => {
     { key: "domingo", label: "Domingo" },
   ];
 
-  // Define Moment-like interface for time objects
-  interface MomentLike {
-    format: (format: string) => string;
-    isBefore: (other: MomentLike) => boolean;
-  }
-
-  const rangoValido = (range: MomentLike[] | unknown): boolean => {
+  const rangoValido = (range: any) => {
     return (
       Array.isArray(range) &&
       range.length === 2 &&
@@ -356,15 +330,7 @@ const DashboardPage = () => {
     );
   };
 
-  interface FormValues {
-    Dias?: string[];
-    horarios?: Record<string, MomentLike[]>;
-    horarioGeneral?: MomentLike[];
-    inicio?: MomentLike;
-    final?: MomentLike;
-  }
-
-  const validarYNormalizarHorarios = (values: FormValues) => {
+  const validarYNormalizarHorarios = (values: any) => {
     const seleccion: string[] = values?.Dias || [];
     if (!Array.isArray(seleccion) || seleccion.length === 0) {
       return {};
@@ -420,7 +386,12 @@ const DashboardPage = () => {
     return salidaGlobal;
   };
 
-
+  const normalizarDecimal = (value: string | undefined): string => {
+    if (!value || typeof value !== "string") return value || "";
+    // Reemplazar comas por puntos
+    return value.replace(/,/g, ".");
+  };
+  // ---------------------------------------------------------------
 
   return (
     <>
@@ -642,13 +613,11 @@ const DashboardPage = () => {
                     setCosteTortalEmpleador(0);
                     setPresupuestos([]);
                     setDesgloses({});
-                  } catch (err: unknown) {
-                    // Define proper error type
-                    const error = err as Error;
+                  } catch (err: any) {
                     message.destroy("generating-pdf");
                     setLoadingPDF(false);
                     message.error(
-                      error.message || "Revisa los horarios seleccionados."
+                      err?.message || "Revisa los horarios seleccionados."
                     );
                   }finally{
                     setLoadingPDF(false)
