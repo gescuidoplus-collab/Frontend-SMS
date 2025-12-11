@@ -58,3 +58,4 @@ Actualiza la sección `images.remotePatterns` en `next.config.ts` si tu API u ot
 ### Troubleshooting
 - Error 403 a la API: confirma que `NEXT_PUBLIC_API_BASE_URL` apunta al host correcto y que CORS en backend permite origen del dominio Vercel.
 - CSP bloquea recursos: revisa consola del navegador y añade el dominio faltante en la cadena `Content-Security-Policy`.
+.
