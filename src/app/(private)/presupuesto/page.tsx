@@ -52,6 +52,8 @@ const DashboardPage = () => {
   const [presupuestos, setPresupuestos] = useState<PresupuestoType[]>([]);
   // Definir tipo para desgloses - sólo valores string para los inputs
   const [desgloses, setDesgloses] = useState<Record<number, string>>({});
+  const [mensajesPresupuesto, setMensajesPresupuestos] = useState<Record<number, string>>({});
+  const [mensajesActivacion, setMensajesActivacion] = useState<Record<number, string>>({});
 
   //VARIABLES INPUT
   const [precioHora, setPrecioHora] = useState(0);
@@ -591,10 +593,12 @@ const DashboardPage = () => {
                         numero: index + 1,
                         resultados: p.resultados,
                         desglose: desgloses[p.id] || "",
+                        mensajesPresupuesto: mensajesPresupuesto[p.id] || "",
+                        mensajesActivacion: mensajesActivacion[p.id] || "",
                       })),
                       Dias: values.Dias || [],
                     };
-                    //console.log("Formulario OK:", payload);
+                    console.log("Formulario OK:", payload);
 
                     const response = await api.post("/generate-pdf", payload, {
                       responseType: "blob", // IMPORTANTE: Para recibir archivos binarios
@@ -653,6 +657,7 @@ const DashboardPage = () => {
                   }
                 }}
               >
+                <Divider>Formulario</Divider>
                 <>
                   <Form.Item
                     label="Nombre de la persona que hace el contrato "
@@ -704,6 +709,7 @@ const DashboardPage = () => {
                     ]}
                   />
                 </Form.Item>
+                <Divider>Horarios</Divider>
                 <Form.Item name="horarioConvenir" valuePropName="checked">
                   <Checkbox>¿Quieres enviar un horario a convenir?</Checkbox>
                 </Form.Item>
@@ -813,6 +819,26 @@ const DashboardPage = () => {
                     </>
                   )
                 }
+                <Divider>Consideraciones adicionales</Divider>
+                <Form.Item
+                    label="Consideracion 1 "
+                    name="considerationOne"
+                  >
+                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                  </Form.Item>
+                  <Form.Item
+                    label="Consideracion 2 "
+                    name="considerationTwo"
+                  >
+                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                  </Form.Item>
+                  <Form.Item
+                    label="Consideracion 3"
+                    name="considerationThree"
+                  >
+                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                  </Form.Item>
+
                 <Divider>Desgloses de Presupuestos</Divider>
 
                 {presupuestos.map((p, index) => (
@@ -829,6 +855,32 @@ const DashboardPage = () => {
                         })
                       }
                     />
+
+                    <Text>Complemento Desgloce Presupuesto {index + 1}</Text>
+                    <Input
+                      style={{ marginTop: 8 }}
+                      placeholder={`Describe el Complemento del presupuesto ${index + 1}`}
+                      value={mensajesPresupuesto[p.id] || ""}
+                      onChange={(e) =>
+                        setMensajesPresupuestos({
+                          ...mensajesPresupuesto,
+                          [p.id]: e.target.value,
+                        })
+                      } 
+                    />
+                    <Text>Complemento Activacion Presupuesto {index + 1}</Text>
+                    <Input
+                      style={{ marginTop: 8 }}
+                      placeholder={`Describe el complemento de la  Activacion ${index + 1}`}
+                      value={mensajesActivacion[p.id] || ""}
+                      onChange={(e) =>
+                        setMensajesActivacion({
+                          ...mensajesActivacion,
+                          [p.id]: e.target.value,
+                        })
+                      }
+                      />
+                  <Divider></Divider>
                   </div>
                 ))}
                 <Form.Item>
