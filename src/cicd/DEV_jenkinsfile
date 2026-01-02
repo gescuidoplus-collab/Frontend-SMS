@@ -7,6 +7,7 @@ pipeline {
                 echo 'Building....'
                 sh '''
 					rm -f gescuidoplus_frontend_sms.tar.gz
+					npm install
 					npm run build
 					tar czvf gescuidoplus_frontend_sms.tar.gz *
                 '''
