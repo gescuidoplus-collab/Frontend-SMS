@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building....'
+                sh '''
+					rm -f gescuidoplus_frontend_sms.tar.gz
+					npm run build
+					tar czvf gescuidoplus_frontend_sms.tar.gz *
+                '''
+            }
+        }
+        stage('Undeploy') {
+            steps {
+            	script {
+	            	echo 'Undeploy...'
+            		sh(script: "ssh jenkins@aquila.emiliollbb.net 'sudo rm -rf /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'")
+            	}
+            }
+        }
+        stage('Deploy') {
+            steps {
+            	script {
+	            	echo 'Deploy...'
+	            	sh(script: "scp $WORKSPACE/target/gescuidoplus_frontend_sms.tar.gz jenkins@aquila.emiliollbb.net:/tmp/")
+					sh(script: "ssh jenkins@aquila.emiliollbb.net 'sudo chown root:root /tmp/gescuidoplus_frontend_sms.tar.gz'")
+					sh(script: "ssh jenkins@aquila.emiliollbb.net 'sudo mkdir /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'")
+					sh(script: "ssh jenkins@aquila.emiliollbb.net 'sudo tar xvf /tmp/gescuidoplus_frontend_sms.tar.gz --one-top-level=/var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'")
+	            	
+	            	def status_code = 0
+	            	def retries = 0
+	            	while(status_code != '200' && retries < 60) {
+	            		sleep(time:30,unit:"SECONDS")
+	            		status_code = sh(script: "curl -sLI -w '%{http_code}' http://localhost:8080 -o /dev/null", returnStdout: true)
+	            		retries++
+	            		echo ('retry: ' + retries)
+	            		echo status_code	
+	            	}
+	            	if (status_code != '200') {
+					    error("Deploy failed. HTTP status: $status_code")
+					}
+            	}
+            }
+        }
+    }
+}
