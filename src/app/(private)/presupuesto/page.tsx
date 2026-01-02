@@ -662,6 +662,12 @@ const DashboardPage = () => {
                     <Input type="text" style={{ width: "100%" }} step={1} />
                   </Form.Item>
                 </>
+                 <Form.Item
+                    label="Complemento Titulo "
+                    name="titleComplement"
+                  >
+                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                  </Form.Item>
                 <Form.Item label="Nombre del Pueblo" name="NombrePueblo" rules={[{ required: true,message:"*Campo Obligatorio"}]}>
                   <Input
                     type="text"
@@ -713,8 +719,10 @@ const DashboardPage = () => {
                     </Form.Item>
                   </>
                 )}
-
-                <Form.Item
+                {
+                  !horarioConvenir && (
+                    <>
+                      <Form.Item
                   name="Dias"
                   label="Dias"
                   rules={[{ required: false }]}
@@ -802,6 +810,9 @@ const DashboardPage = () => {
                     );
                   })}
                 </Row>
+                    </>
+                  )
+                }
                 <Divider>Desgloses de Presupuestos</Divider>
 
                 {presupuestos.map((p, index) => (
@@ -823,12 +834,13 @@ const DashboardPage = () => {
                 <Form.Item>
                   <Button
                     style={{
-                      background: "#6366f2",
                       color: "#fff",
                       fontWeight: "bold",
                       marginTop: "10px",
                     }}
+                    disabled={presupuestos.length === 0}
                     icon= {<DownloadOutlined/>}
+                    type="primary"
                     htmlType="submit"
                     block
                     size="large"
