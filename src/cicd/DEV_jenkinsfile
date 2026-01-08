@@ -6,8 +6,9 @@ pipeline {
             steps {
                 echo 'Building....'
                 sh '''
-					rm -f gescuidoplus_frontend_sms.tar.gz
-					tar czvf gescuidoplus_frontend_sms.tar.gz *
+					rm -rf target
+					mkdir target
+					tar czvf target/gescuidoplus_frontend_sms.tar.gz *
                 '''
             }
         }
