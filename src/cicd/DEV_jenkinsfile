@@ -7,8 +7,10 @@ pipeline {
                 echo 'Building....'
                 sh '''
 					rm -rf target
+					rm -rf gescuidoplus_frontend_sms.tar.gz
+					tar czvf gescuidoplus_frontend_sms.tar.gz *
 					mkdir target
-					tar czvf target/gescuidoplus_frontend_sms.tar.gz *
+					mv gescuidoplus_frontend_sms.tar.gz target/
                 '''
             }
         }
