@@ -38,6 +38,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   basePath: '/gescuidoplus',
+  trailingSlash: true,
   images: {
     remotePatterns: [
       {
