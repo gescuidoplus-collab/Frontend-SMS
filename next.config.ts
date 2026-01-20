@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
   basePath: '/gescuidoplus',
   trailingSlash: true,
   images: {
+    unoptimized: false,
     remotePatterns: [
       {
         protocol: "https",
