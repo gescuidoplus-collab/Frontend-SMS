@@ -43,7 +43,7 @@ pipeline {
 	            	def retries = 0
 	            	while(status_code != '200' && retries < 20) {
 	            		sleep(time:30,unit:"SECONDS")
-	            		status_code = sh(script: "curl -sLI -w '%{http_code}' http://dev.cloudnavis.com:3000 -o /dev/null", returnStdout: true)
+	            		status_code = sh(script: "curl -sLI -w '%{http_code}' http://dev.cloudnavis.com:3000/gescuidoplus -o /dev/null", returnStdout: true)
 	            		retries++
 	            		echo ('retry: ' + retries)
 	            		echo status_code	
