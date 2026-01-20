@@ -33,7 +33,7 @@ pipeline {
 						ssh jenkins@aquila.emiliollbb.net 'sudo chown jenkins:jenkins /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'
 						ssh jenkins@aquila.emiliollbb.net 'tar xvf /tmp/gescuidoplus_frontend_sms.tar.gz --one-top-level=/var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'
 						ssh jenkins@aquila.emiliollbb.net 'rm /tmp/gescuidoplus_frontend_sms.tar.gz'
-						ssh jenkins@aquila.emiliollbb.net 'cd /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms && npm install'
+						ssh jenkins@aquila.emiliollbb.net 'cd /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms && npm install && npm run build'
 						ssh jenkins@aquila.emiliollbb.net 'sudo chown -R nodejs:nodejs /var/lib/nodejs/nodeapps/gescuidoplus_frontend_sms'
 						ssh jenkins@aquila.emiliollbb.net 'sudo systemctl start gescuidoplus_frontend_sms.service'
                 	'''
