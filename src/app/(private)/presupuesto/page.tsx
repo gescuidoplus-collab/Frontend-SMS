@@ -239,13 +239,6 @@ const DashboardPage = () => {
   };
 
   const limpiarFormulario = () => {
-    /* 
-    setPrecioHora(0);
-    setDiasTrabajo(0);
-    setHorasDia(0);
-    setSemanasAlMes(0);
-    setSalarioNetoManual(0);
-    setPrecioServicio(0); */
     setResultadosActuales(null);
     setHorasTotalesMensuales(0);
     setSalarioNetoMensual(0);
