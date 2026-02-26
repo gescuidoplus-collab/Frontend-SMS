@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const privatePaths = ["/dashboard"];
-const authPaths = ["/login"];
+const privatePaths = ["/gescuidoplus/dashboard"];
+const authPaths = ["/gescuidoplus/login"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -9,13 +9,13 @@ export function middleware(request: NextRequest) {
 
   if (privatePaths.some((path) => pathname.startsWith(path))) {
     if (!token) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return NextResponse.redirect(new URL("/gescuidoplus/login", request.url));
     }
   }
 
   if (authPaths.some((path) => pathname.startsWith(path))) {
     if (token) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/gescuidoplus/dashboard", request.url));
     }
   }
 
@@ -23,5 +23,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: ["/gescuidoplus/dashboard/:path*", "/gescuidoplus/login"],
 };
