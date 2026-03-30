@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const privatePaths = ["/gescuidoplus/dashboard"];
+const privatePaths = ["/dashboard", "/gescuidoplus/dashboard"];
 const authPaths = ["/gescuidoplus/login"];
 
 export function middleware(request: NextRequest) {
@@ -23,5 +23,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/gescuidoplus/dashboard/:path*", "/gescuidoplus/login"],
+  matcher: ["/dashboard/:path*", "/gescuidoplus/dashboard/:path*", "/gescuidoplus/login"],
 };

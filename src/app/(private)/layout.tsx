@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Layout, Menu } from "antd";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -15,6 +15,13 @@ export default function PrivateLayout({
 }) {
   const SIDER_WIDTH = 200;
   const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.replace("/gescuidoplus/login");
+    }
+  }, [router]);
 
   const handleMenuClick = (key: string) => {
     const routes: Record<string, string> = {
