@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL:  "https://dev.cloudnavis.com/gescuidoplus_back",
+  baseURL:  "http://localhost:3001/api/v1",
 });
 
 api.interceptors.request.use(
