@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL:  "https://backend-sms-production-0b80.up.railway.app",
+  baseURL:  "https://backend-sms-production-0b80.up.railway.app/api/v1",
 });
 
 api.interceptors.request.use(
