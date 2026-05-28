@@ -2,7 +2,7 @@
 
 import React, {  useState } from "react";
 import { Table } from "antd";
-import { PlusOutlined,  DownloadOutlined } from '@ant-design/icons';
+import { PlusOutlined,  DownloadOutlined, CalculatorOutlined } from '@ant-design/icons';
 import api from "@/lib/axios";
 import {
   Card,
@@ -22,7 +22,6 @@ import {
   Divider,
 } from "antd";
 const { Title, Text } = Typography;
-import PageHeader from "@/components/PageHeader";
 
 const DashboardPage = () => {
   const [form] = Form.useForm();
@@ -416,18 +415,21 @@ const DashboardPage = () => {
   };
 
   return (
-    <>
-      <PageHeader
-        title="Calculadora de Sueldos"
-        description="Convenio Empleadas de Hogar"
-      />
+    <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
+      <div style={{ background: "#fff", borderRadius: 8, padding: "24px 24px 0" }}>
+        <Space align="center" style={{ margin: "0 0 16px 0" }}>
+          <CalculatorOutlined style={{ fontSize: 28, color: "#6366f2" }} />
+          <div>
+            <Title level={4} style={{ margin: 0 }}>Calculadora de Sueldos</Title>
+            <Text type="secondary">Convenio Empleadas de Hogar</Text>
+          </div>
+        </Space>
 
-      <div style={{ padding: 24 }}>
-        <Button.Group style={{ marginBottom: 24 }} size="middle">
+        <div style={{ marginBottom: 24 }}>
           <Button type="primary" size="large">
             Calcular desde precio/hora
           </Button>
-        </Button.Group>
+        </div>
 
         <Flex gap={24} align="flex-start">
           {/* Columna Izquierda - Formulario */}
@@ -999,9 +1001,9 @@ const DashboardPage = () => {
                   {ivaPrecioServicio.toFixed(2)}€
                 </Title>
               </Card>
-              <Card size="small" style={{ borderLeft: "4px solid #6366f2" }}>
+              <Card size="small" style={{ background: "#e6f4ff", borderLeft: "4px solid #1677ff", borderRadius: 8 }}>
                 <Text type="secondary">COSTE TOTAL PARA EL EMPLEADOR</Text>
-                <Title level={5} style={{ margin: "0px 0" }}>
+                <Title level={3} style={{ margin: "4px 0", color: "#1677ff" }}>
                   {costeTotalEmpleador.toFixed(2)}€
                 </Title>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -1025,7 +1027,7 @@ const DashboardPage = () => {
           />
         </Card>
       </div>
-    </>
+    </div>
   );
 };
 

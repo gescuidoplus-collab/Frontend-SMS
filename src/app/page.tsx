@@ -10,7 +10,7 @@ export default function Home() {
     if (token) {
       router.replace("/dashboard");
     } else {
-      router.replace("/gescuidoplus/login");
+      router.replace("/login");
     }
   }, [router]);
 

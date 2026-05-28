@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Tag, type TablePaginationConfig } from "antd";
+import { Table, Tag, type TablePaginationConfig, Space, Typography } from "antd";
+import { MessageOutlined } from "@ant-design/icons";
 import api from "@/lib/axios";
-import PageHeader from "@/components/PageHeader";
+
+const { Title, Text } = Typography;
 
 const DashboardPage = () => {
   interface PersonInfo {
@@ -191,12 +193,16 @@ const DashboardPage = () => {
   );
 
   return (
-    <>
-      <PageHeader
-        title="Panel de Facturas"
-        description="Visualiza el historial de envíos de SMS"
-      />
-      <Table
+    <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
+      <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden", padding: "24px" }}>
+        <Space align="center" style={{ margin: "0 0 16px 0" }}>
+          <MessageOutlined style={{ fontSize: 28, color: "#1677ff" }} />
+          <div>
+            <Title level={4} style={{ margin: 0 }}>Reporte de Mensajes</Title>
+            <Text type="secondary">Visualiza el historial de envíos de SMS</Text>
+          </div>
+        </Space>
+        <Table
         columns={columns}
         dataSource={messages}
         loading={loading}
@@ -214,7 +220,8 @@ const DashboardPage = () => {
         }}
         onChange={handleTableChange}
       />
-    </>
+      </div>
+    </div>
   );
 };
 
