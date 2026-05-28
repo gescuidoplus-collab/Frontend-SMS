@@ -38,7 +38,6 @@ interface FormValues {
   nombretrabajador?: string;
   niftrabajador?: string;
   correotrabajador?: string;
-  fechanactrabajador?: string;
   numafiliaciontrabajador?: string;
   nivelformativotrabajador?: string;
   nacionalidadtrabajador?: string;
