@@ -578,6 +578,8 @@ const DashboardPage = () => {
                 onFinish={async (values) => {
                   try {
                     setLoadingPDF(true);
+                    message.loading({ content: "Generando PDF...", key: "generating-pdf" });
+
                     const horariosNormalizados =
                       validarYNormalizarHorarios(values);
                     const payload = {
@@ -612,8 +614,7 @@ const DashboardPage = () => {
                     link.remove();
                     window.URL.revokeObjectURL(url);
                     message.destroy("generating-pdf");
-                    setLoadingPDF(false);
-                    message.success("PDF generado correctamente");
+                    message.success("✓ PDF generado correctamente y descargado");
 
                     // Resetear todos los campos solo si el PDF se genera correctamente
                     form.resetFields();
@@ -640,15 +641,11 @@ const DashboardPage = () => {
                     setPresupuestos([]);
                     setDesgloses({});
                   } catch (err: unknown) {
-                    // Define proper error type
                     const error = err as Error;
                     message.destroy("generating-pdf");
+                    message.error(`Error al generar PDF: ${error.message || "Revisa los horarios seleccionados."}`);
+                  } finally {
                     setLoadingPDF(false);
-                    message.error(
-                      error.message || "Revisa los horarios seleccionados."
-                    );
-                  }finally{
-                    setLoadingPDF(false)
                   }
                 }}
               >

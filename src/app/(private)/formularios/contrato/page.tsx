@@ -68,6 +68,8 @@ export default function ContratoPage() {
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
+    message.loading({ content: "Enviando contrato...", key: "sending" });
+
     try {
       const payload = {
         nomempleador: values.nomempleador || "",
@@ -114,30 +116,36 @@ export default function ContratoPage() {
       const responseData = await response.text();
       console.log("Response:", responseData);
 
+      message.destroy("sending");
+
       if (response.ok) {
-        Modal.success({
-          title: "¡Contrato Enviado Correctamente!",
-          icon: <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 48 }} />,
-          content: (
-            <div>
-              <p style={{ marginBottom: 12 }}>
-                ✓ La invitación a la firma ha sido enviada a los correos correspondientes.
-              </p>
-              <p style={{ marginBottom: 12 }}>
-                ✓ Puedes ver el documento en <strong>SignNow</strong>
-              </p>
-              <p>
-                ✓ Una vez se firme, se guardará automáticamente en <strong>Google Drive</strong>
-              </p>
-            </div>
-          ),
-          okText: "Cerrar",
-          onOk: () => {
-            form.resetFields();
-            router.push("/formularios");
-          },
-        });
+        message.success("✓ Contrato enviado correctamente");
+        setTimeout(() => {
+          Modal.success({
+            title: "¡Contrato Enviado Correctamente!",
+            icon: <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 48 }} />,
+            content: (
+              <div>
+                <p style={{ marginBottom: 12 }}>
+                  ✓ La invitación a la firma ha sido enviada a los correos correspondientes.
+                </p>
+                <p style={{ marginBottom: 12 }}>
+                  ✓ Puedes ver el documento en <strong>SignNow</strong>
+                </p>
+                <p>
+                  ✓ Una vez se firme, se guardará automáticamente en <strong>Google Drive</strong>
+                </p>
+              </div>
+            ),
+            okText: "Cerrar",
+            onOk: () => {
+              form.resetFields();
+              router.push("/formularios");
+            },
+          });
+        }, 500);
       } else {
+        message.error("Error al enviar contrato");
         Modal.error({
           title: "Error al Enviar el Formulario",
           icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f", fontSize: 48 }} />,
@@ -158,6 +166,8 @@ export default function ContratoPage() {
       }
     } catch (error) {
       console.error("Error:", error);
+      message.destroy("sending");
+      message.error("Error de conexión");
       Modal.error({
         title: "Error de Conexión",
         icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f", fontSize: 48 }} />,
