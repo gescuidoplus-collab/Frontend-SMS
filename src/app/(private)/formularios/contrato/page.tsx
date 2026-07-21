@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -65,6 +65,102 @@ export default function ContratoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefill: Partial<FormValues> = {};
+
+    const fechacontrato = params.get("fechacontrato");
+    if (fechacontrato) {
+      const parsed = dayjs(fechacontrato, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fechacontrato = parsed;
+    }
+
+    const fechanactrabajador = params.get("fechanactrabajador");
+    if (fechanactrabajador) {
+      const parsed = dayjs(fechanactrabajador, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fechanactrabajador = parsed;
+    }
+
+    const montobruto = params.get("montobruto");
+    if (montobruto !== null) {
+      const num = Number(montobruto);
+      if (!Number.isNaN(num)) prefill.montobruto = num;
+    }
+
+    const nomempleador = params.get("nomempleador");
+    if (nomempleador) prefill.nomempleador = nomempleador;
+
+    const nifempleador = params.get("nifempleador");
+    if (nifempleador) prefill.nifempleador = nifempleador;
+
+    const correoempleador = params.get("correoempleador");
+    if (correoempleador) prefill.correoempleador = correoempleador;
+
+    const regimen = params.get("regimen");
+    if (regimen) prefill.regimen = regimen;
+
+    const codigo = params.get("codigo");
+    if (codigo) prefill.codigo = codigo;
+
+    const prov = params.get("prov");
+    if (prov) prefill.prov = prov;
+
+    const numero = params.get("numero");
+    if (numero) prefill.numero = numero;
+
+    const dig = params.get("dig");
+    if (dig) prefill.dig = dig;
+
+    const contr = params.get("contr");
+    if (contr) prefill.contr = contr;
+
+    const domicilio = params.get("domicilio");
+    if (domicilio) prefill.domicilio = domicilio;
+
+    const municipio = params.get("municipio");
+    if (municipio) prefill.municipio = municipio;
+
+    const nombretrabajador = params.get("nombretrabajador");
+    if (nombretrabajador) prefill.nombretrabajador = nombretrabajador;
+
+    const niftrabajador = params.get("niftrabajador");
+    if (niftrabajador) prefill.niftrabajador = niftrabajador;
+
+    const correotrabajador = params.get("correotrabajador");
+    if (correotrabajador) prefill.correotrabajador = correotrabajador;
+
+    const numafiliaciontrabajador = params.get("numafiliaciontrabajador");
+    if (numafiliaciontrabajador) prefill.numafiliaciontrabajador = numafiliaciontrabajador;
+
+    const nivelformativotrabajador = params.get("nivelformativotrabajador");
+    if (nivelformativotrabajador) prefill.nivelformativotrabajador = nivelformativotrabajador;
+
+    const nacionalidadtrabajador = params.get("nacionalidadtrabajador");
+    if (nacionalidadtrabajador) prefill.nacionalidadtrabajador = nacionalidadtrabajador;
+
+    const municipiodomtrabaajdor = params.get("municipiodomtrabaajdor");
+    if (municipiodomtrabaajdor) prefill.municipiodomtrabaajdor = municipiodomtrabaajdor;
+
+    const paisdomtrabajador = params.get("paisdomtrabajador");
+    if (paisdomtrabajador) prefill.paisdomtrabajador = paisdomtrabajador;
+
+    const lugarfirma = params.get("lugarfirma");
+    if (lugarfirma) prefill.lugarfirma = lugarfirma;
+
+    const mesfirma = params.get("mesfirma");
+    if (mesfirma) prefill.mesfirma = mesfirma;
+
+    const diafirma = params.get("diafirma");
+    if (diafirma) prefill.diafirma = diafirma;
+
+    const anofirma = params.get("anofirma");
+    if (anofirma) prefill.anofirma = anofirma;
+
+    if (Object.keys(prefill).length === 0) return;
+    form.setFieldsValue(prefill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
