@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -149,6 +149,69 @@ export default function FiniquitoPage() {
   const [aplicaIndemnizacion, setAplicaIndemnizacion] = useState(false);
   const [calculado, setCalculado] = useState<Calculado | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefill: Partial<FormValues> = {};
+
+    const fecha = params.get("fecha");
+    if (fecha) {
+      const parsed = dayjs(fecha, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fecha = parsed;
+    }
+
+    const fechadesde = params.get("fechadesde");
+    if (fechadesde) {
+      const parsed = dayjs(fechadesde, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fechadesde = parsed;
+    }
+
+    const diasalario = params.get("diasalario");
+    if (diasalario) {
+      const parsed = dayjs(diasalario, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.diasalario = parsed;
+    }
+
+    const fechasalariofinalconanio = params.get("fechasalariofinalconanio");
+    if (fechasalariofinalconanio) {
+      const parsed = dayjs(fechasalariofinalconanio, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fechasalariofinalconanio = parsed;
+    }
+
+    const nomempleada = params.get("nomempleada");
+    if (nomempleada) prefill.nomempleada = nomempleada;
+
+    const niempleada = params.get("niempleada");
+    if (niempleada) prefill.niempleada = niempleada;
+
+    const correoempleada = params.get("correoempleada");
+    if (correoempleada) prefill.correoempleada = correoempleada;
+
+    const nomempleador = params.get("nomempleador");
+    if (nomempleador) prefill.nomempleador = nomempleador;
+
+    const correoempleador = params.get("correoempleador");
+    if (correoempleador) prefill.correoempleador = correoempleador;
+
+    const salarioNeto = params.get("salarioNeto");
+    if (salarioNeto !== null) {
+      const num = Number(salarioNeto);
+      if (!Number.isNaN(num)) prefill.salarioNeto = num;
+    }
+
+    const diasSinPreaviso = params.get("diasSinPreaviso");
+    if (diasSinPreaviso !== null) {
+      const num = Number(diasSinPreaviso);
+      if (!Number.isNaN(num)) prefill.diasSinPreaviso = num;
+    }
+
+    if (Object.keys(prefill).length === 0) return;
+
+    form.setFieldsValue(prefill);
+    const merged = { ...form.getFieldsValue(), aplicaPreaviso, aplicaIndemnizacion };
+    setCalculado(calcularFiniquito(merged));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onValuesChange = (_: Partial<FormValues>, allValues: FormValues) => {
     const result = calcularFiniquito({
