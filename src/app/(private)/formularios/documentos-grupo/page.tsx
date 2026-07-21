@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -64,6 +64,99 @@ export default function DocumentosGrupoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefill: Partial<FormValues> = {};
+
+    const fechaFirma = params.get("fechaFirma");
+    if (fechaFirma) {
+      const parsed = dayjs(fechaFirma, "YYYY-MM-DD", true);
+      if (parsed.isValid()) prefill.fechaFirma = parsed;
+    }
+
+    const diaNacimiento = params.get("diaNacimiento");
+    if (diaNacimiento !== null) {
+      const num = Number(diaNacimiento);
+      if (!Number.isNaN(num)) prefill.diaNacimiento = num;
+    }
+
+    const mesNacimiento = params.get("mesNacimiento");
+    if (mesNacimiento !== null) {
+      const num = Number(mesNacimiento);
+      if (!Number.isNaN(num)) prefill.mesNacimiento = num;
+    }
+
+    const anioNacimiento = params.get("anioNacimiento");
+    if (anioNacimiento !== null) {
+      const num = Number(anioNacimiento);
+      if (!Number.isNaN(num)) prefill.anioNacimiento = num;
+    }
+
+    const primerApellido = params.get("primerApellido");
+    if (primerApellido) prefill.primerApellido = primerApellido;
+
+    const segundoApellido = params.get("segundoApellido");
+    if (segundoApellido) prefill.segundoApellido = segundoApellido;
+
+    const nombres = params.get("nombres");
+    if (nombres) prefill.nombres = nombres;
+
+    const nif = params.get("nif");
+    if (nif) prefill.nif = nif;
+
+    const sexo = params.get("sexo");
+    if (sexo) prefill.sexo = sexo;
+
+    const numeroDocumento = params.get("numeroDocumento");
+    if (numeroDocumento) prefill.numeroDocumento = numeroDocumento;
+
+    const tipoDocumento = params.get("tipoDocumento");
+    if (tipoDocumento) prefill.tipoDocumento = tipoDocumento;
+
+    const tipoVia = params.get("tipoVia");
+    if (tipoVia) prefill.tipoVia = tipoVia;
+
+    const nombreVia = params.get("nombreVia");
+    if (nombreVia) prefill.nombreVia = nombreVia;
+
+    const bloque = params.get("bloque");
+    if (bloque) prefill.bloque = bloque;
+
+    const numero = params.get("numero");
+    if (numero) prefill.numero = numero;
+
+    const puerta = params.get("puerta");
+    if (puerta) prefill.puerta = puerta;
+
+    const codPostal = params.get("codPostal");
+    if (codPostal) prefill.codPostal = codPostal;
+
+    const municipio = params.get("municipio");
+    if (municipio) prefill.municipio = municipio;
+
+    const provincia = params.get("provincia");
+    if (provincia) prefill.provincia = provincia;
+
+    const pais = params.get("pais");
+    if (pais) prefill.pais = pais;
+
+    const codigoSwift = params.get("codigoSwift");
+    if (codigoSwift) prefill.codigoSwift = codigoSwift;
+
+    const numeroCuenta = params.get("numeroCuenta");
+    if (numeroCuenta) prefill.numeroCuenta = numeroCuenta;
+
+    const cuentaCotizacion = params.get("cuentaCotizacion");
+    if (cuentaCotizacion) prefill.cuentaCotizacion = cuentaCotizacion;
+
+    const lugarFirma = params.get("lugarFirma");
+    if (lugarFirma) prefill.lugarFirma = lugarFirma;
+
+    if (Object.keys(prefill).length === 0) return;
+    form.setFieldsValue(prefill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
