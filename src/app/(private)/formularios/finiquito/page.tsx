@@ -14,8 +14,16 @@ import {
   message,
   Modal,
   DatePicker,
+  Switch,
+  Divider,
+  Descriptions,
 } from "antd";
-import { ArrowLeftOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  CalculatorOutlined,
+} from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
@@ -32,43 +40,134 @@ interface FormValues {
   fechadesde?: Dayjs;
   diasalario?: Dayjs;
   fechasalariofinalconanio?: Dayjs;
-  monto1?: number;
-  monto2?: number;
-  total?: number;
+  salarioNeto?: number;
+  aplicaPreaviso?: boolean;
+  diasSinPreaviso?: number;
+  aplicaIndemnizacion?: boolean;
 }
 
-const formatearFecha = (date: Dayjs | undefined, tipo: "completa" | "completaDel" | "mesYDia"): string => {
+interface Calculado {
+  diasTrabajados: number;
+  diasVacaciones: number;
+  salarioPendiente: number;
+  importeVacaciones: number;
+  importePreaviso: number;
+  importeIndemnizacion: number;
+  total: number;
+}
+
+const formatearFecha = (
+  date: Dayjs | undefined,
+  tipo: "completa" | "completaDel" | "mesYDia"
+): string => {
   if (!date) return "";
-  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const meses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  ];
   const dia = date.date();
   const mes = meses[date.month()];
   const anio = date.year();
 
-  if (tipo === "mesYDia") {
-    return `${dia} de ${mes}`;
-  } else if (tipo === "completaDel") {
-    return `${dia} de ${mes} del ${anio}`;
-  } else {
-    return `${dia} de ${mes} ${anio}`;
+  if (tipo === "mesYDia") return `${dia} de ${mes}`;
+  if (tipo === "completaDel") return `${dia} de ${mes} del ${anio}`;
+  return `${dia} de ${mes} ${anio}`;
+};
+
+// Tabla oficial Orden PJC/297/2026 — DIFERENTE a la tabla de presupuesto
+const determinarTramoFiniquito = (salarioNeto: number): number => {
+  if (salarioNeto <= 329) return 306;
+  if (salarioNeto <= 451) return 436;
+  if (salarioNeto <= 620) return 602;
+  if (salarioNeto <= 850) return 785;
+  if (salarioNeto <= 1050) return 970;
+  if (salarioNeto <= 1155) return 1151;
+  if (salarioNeto <= 1424.4) return 1424;
+  return salarioNeto; // Tramo 8: base = salario real
+};
+
+const calcularFiniquito = (values: FormValues): Calculado | null => {
+  const {
+    fechadesde,
+    fechasalariofinalconanio,
+    diasalario,
+    salarioNeto,
+    aplicaPreaviso,
+    diasSinPreaviso,
+    aplicaIndemnizacion,
+  } = values;
+
+  if (!fechadesde || !fechasalariofinalconanio || !diasalario || !salarioNeto || salarioNeto <= 0) {
+    return null;
   }
+
+  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day") + 1;
+  if (diasTrabajados <= 0) return null;
+
+  const salarioDiarioNeto = salarioNeto / 30;
+
+  // 1. Vacaciones proporcionales
+  const diasVacaciones = (diasTrabajados * 30) / 365;
+  const importeVacaciones = diasVacaciones * salarioDiarioNeto;
+
+  // 2. Salario pendiente del período
+  const diasPeriodo = fechasalariofinalconanio.diff(diasalario, "day") + 1;
+  const salarioPendiente = Math.max(0, diasPeriodo * salarioDiarioNeto);
+
+  // 3. Indemnización (solo si aplica)
+  let importeIndemnizacion = 0;
+  if (aplicaIndemnizacion) {
+    const anos = diasTrabajados / 365;
+    const baseCotizacion = determinarTramoFiniquito(salarioNeto);
+    const salarioDiarioBase = baseCotizacion / 30;
+    importeIndemnizacion = salarioDiarioBase * 12 * anos;
+  }
+
+  // 4. Preaviso (solo si aplica)
+  let importePreaviso = 0;
+  if (aplicaPreaviso && diasSinPreaviso && diasSinPreaviso > 0) {
+    importePreaviso = salarioDiarioNeto * diasSinPreaviso;
+  }
+
+  const total = salarioPendiente + importeVacaciones + importeIndemnizacion + importePreaviso;
+
+  return {
+    diasTrabajados,
+    diasVacaciones,
+    salarioPendiente,
+    importeVacaciones,
+    importePreaviso,
+    importeIndemnizacion,
+    total,
+  };
 };
 
 export default function FiniquitoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [aplicaPreaviso, setAplicaPreaviso] = useState(false);
+  const [aplicaIndemnizacion, setAplicaIndemnizacion] = useState(false);
+  const [calculado, setCalculado] = useState<Calculado | null>(null);
   const router = useRouter();
 
-  const onValuesChange = (changedValues: Partial<FormValues>, allValues: FormValues) => {
-    const monto1 = allValues.monto1 || 0;
-    const monto2 = allValues.monto2 || 0;
-    const total = monto1 + monto2;
-
-    if (changedValues.monto1 !== undefined || changedValues.monto2 !== undefined) {
-      form.setFieldValue("total", total);
-    }
+  const onValuesChange = (_: Partial<FormValues>, allValues: FormValues) => {
+    const result = calcularFiniquito({
+      ...allValues,
+      aplicaPreaviso,
+      aplicaIndemnizacion,
+    });
+    setCalculado(result);
   };
 
+  const fmt = (n: number) =>
+    n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const onFinish = async (values: FormValues) => {
+    if (!calculado) {
+      message.warning("Completa los datos para calcular el finiquito");
+      return;
+    }
+
     setLoading(true);
     message.loading({ content: "Enviando finiquito...", key: "sending" });
 
@@ -83,26 +182,24 @@ export default function FiniquitoPage() {
         fechadesde: formatearFecha(values.fechadesde, "completaDel"),
         diasalario: formatearFecha(values.diasalario, "mesYDia"),
         fechasalariofinalconanio: formatearFecha(values.fechasalariofinalconanio, "completa"),
-        monto1: values.monto1?.toString() || "",
-        monto2: values.monto2?.toString() || "",
-        total: values.total?.toString() || "",
+        // campos existentes — ahora calculados automáticamente
+        monto1: calculado.salarioPendiente.toFixed(2),
+        monto2: calculado.importeVacaciones.toFixed(2),
+        total: calculado.total.toFixed(2),
+        // 3 campos nuevos para Make → SignNow
+        vacacionesdias: calculado.diasVacaciones.toFixed(3),
+        preaviso: aplicaPreaviso ? calculado.importePreaviso.toFixed(2) : "no procede",
+        indemnizacion: aplicaIndemnizacion ? calculado.importeIndemnizacion.toFixed(2) : "no procede",
       };
-
-      console.log("Enviando payload:", JSON.stringify(payload, null, 2));
 
       const response = await fetch(
         "https://hook.eu2.make.com/dw7e2ijv5h2rpuitnhhbw2p8agfq66py",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
-
-      const responseData = await response.text();
-      console.log("Response:", responseData);
 
       message.destroy("sending");
 
@@ -128,6 +225,9 @@ export default function FiniquitoPage() {
             okText: "Cerrar",
             onOk: () => {
               form.resetFields();
+              setCalculado(null);
+              setAplicaPreaviso(false);
+              setAplicaIndemnizacion(false);
               router.push("/formularios");
             },
           });
@@ -204,8 +304,9 @@ export default function FiniquitoPage() {
             onFinish={onFinish}
             onValuesChange={onValuesChange}
             autoComplete="off"
+            initialValues={{ diasSinPreaviso: 7 }}
           >
-            {/* Sección: Información General */}
+            {/* Información General */}
             <Card title="Información General" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
@@ -214,13 +315,13 @@ export default function FiniquitoPage() {
                     name="fecha"
                     rules={[{ required: true, message: "Este campo es requerido" }]}
                   >
-                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 24 de Abril 2026" />
+                    <DatePicker style={{ width: "100%" }} placeholder="Selecciona la fecha" />
                   </Form.Item>
                 </Col>
               </Row>
             </Card>
 
-            {/* Sección: Datos de la Empleada */}
+            {/* Datos de la Empleada */}
             <Card title="Datos de la Empleada" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
@@ -247,7 +348,7 @@ export default function FiniquitoPage() {
                     name="correoempleada"
                     rules={[
                       { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" }
+                      { type: "email", message: "Ingresa un correo válido" },
                     ]}
                   >
                     <Input placeholder="ejemplo@email.com" type="email" />
@@ -256,7 +357,7 @@ export default function FiniquitoPage() {
               </Row>
             </Card>
 
-            {/* Sección: Datos del Empleador */}
+            {/* Datos del Empleador */}
             <Card title="Datos del Empleador" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
@@ -274,7 +375,7 @@ export default function FiniquitoPage() {
                     name="correoempleador"
                     rules={[
                       { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" }
+                      { type: "email", message: "Ingresa un correo válido" },
                     ]}
                   >
                     <Input placeholder="ejemplo@empresa.com" type="email" />
@@ -283,102 +384,183 @@ export default function FiniquitoPage() {
               </Row>
             </Card>
 
-            {/* Sección: Periodo de Trabajo */}
-            <Card title="Periodo de Trabajo" style={{ marginBottom: "24px" }}>
+            {/* Periodo y Salario */}
+            <Card title="Periodo de Trabajo y Salario" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Fecha de Inicio"
+                    label="Fecha de Inicio del Contrato"
                     name="fechadesde"
                     rules={[{ required: true, message: "La fecha de inicio es requerida" }]}
                   >
-                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 24 de Abril del 2026" />
+                    <DatePicker style={{ width: "100%" }} placeholder="Fecha de alta" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Día de Salario"
-                    name="diasalario"
-                    rules={[{ required: true, message: "El día de salario es requerido" }]}
-                  >
-                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 20 de Abril" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Fecha de Salario Final"
+                    label="Fecha de Baja / Extinción"
                     name="fechasalariofinalconanio"
-                    rules={[{ required: true, message: "La fecha final es requerida" }]}
+                    rules={[{ required: true, message: "La fecha de baja es requerida" }]}
                   >
-                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 24 de Abril 2026" />
+                    <DatePicker style={{ width: "100%" }} placeholder="Fecha de baja" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Inicio del Último Período Salarial"
+                    name="diasalario"
+                    rules={[{ required: true, message: "El día de inicio de salario es requerido" }]}
+                  >
+                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 1 de Junio" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Salario Neto Mensual (€)"
+                    name="salarioNeto"
+                    rules={[{ required: true, message: "El salario neto es requerido" }]}
+                  >
+                    <InputNumber
+                      placeholder="Ej. 1333.33"
+                      step={0.01}
+                      min={0.01}
+                      precision={2}
+                      style={{ width: "100%" }}
+                      addonAfter="€"
+                    />
                   </Form.Item>
                 </Col>
               </Row>
             </Card>
 
-            {/* Sección: Montos */}
-            <Card title="Cálculo de Finiquito" style={{ marginBottom: "24px" }}>
+            {/* Conceptos especiales */}
+            <Card title="Conceptos Especiales" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Salario Pendiente"
-                    name="monto1"
-                    rules={[
-                      { required: true, message: "El salario es requerido" },
-                      { type: "number", message: "Debe ser un número válido" }
-                    ]}
-                  >
-                    <InputNumber
-                      placeholder="0.00"
-                      step={0.01}
-                      min={0}
-                      precision={2}
-                      style={{ width: "100%" }}
+                  <Form.Item label="¿Aplica falta de preaviso?" name="aplicaPreaviso" valuePropName="checked">
+                    <Switch
+                      onChange={(checked) => {
+                        setAplicaPreaviso(checked);
+                        const vals = form.getFieldsValue();
+                        const result = calcularFiniquito({
+                          ...vals,
+                          aplicaPreaviso: checked,
+                          aplicaIndemnizacion,
+                        });
+                        setCalculado(result);
+                      }}
                     />
                   </Form.Item>
                 </Col>
+                {aplicaPreaviso && (
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      label="Días sin preaviso"
+                      name="diasSinPreaviso"
+                      rules={[{ required: true, message: "Indica los días" }]}
+                    >
+                      <InputNumber
+                        min={1}
+                        max={30}
+                        precision={0}
+                        style={{ width: "100%" }}
+                        addonAfter="días"
+                      />
+                    </Form.Item>
+                  </Col>
+                )}
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Vacaciones No Disfrutadas"
-                    name="monto2"
-                    rules={[
-                      { required: true, message: "Las vacaciones son requeridas" },
-                      { type: "number", message: "Debe ser un número válido" }
-                    ]}
-                  >
-                    <InputNumber
-                      placeholder="0.00"
-                      step={0.01}
-                      min={0}
-                      precision={2}
-                      style={{ width: "100%" }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Total a Pagar"
-                    name="total"
-                  >
-                    <InputNumber
-                      placeholder="Cálculo automático"
-                      step={0.01}
-                      min={0}
-                      precision={2}
-                      disabled
-                      style={{ width: "100%" }}
+                  <Form.Item label="¿Aplica indemnización por despido?" name="aplicaIndemnizacion" valuePropName="checked">
+                    <Switch
+                      onChange={(checked) => {
+                        setAplicaIndemnizacion(checked);
+                        const vals = form.getFieldsValue();
+                        const result = calcularFiniquito({
+                          ...vals,
+                          aplicaPreaviso,
+                          aplicaIndemnizacion: checked,
+                        });
+                        setCalculado(result);
+                      }}
                     />
                   </Form.Item>
                 </Col>
               </Row>
+            </Card>
+
+            {/* Resultado calculado */}
+            <Card
+              title={
+                <Space>
+                  <CalculatorOutlined />
+                  Resumen del Finiquito
+                </Space>
+              }
+              style={{ marginBottom: "24px" }}
+              styles={{ body: { background: calculado ? "#f6ffed" : "#fafafa" } }}
+            >
+              {calculado ? (
+                <>
+                  <Descriptions column={1} bordered size="small">
+                    <Descriptions.Item label="Salario pendiente del período">
+                      <strong>{fmt(calculado.salarioPendiente)} €</strong>
+                    </Descriptions.Item>
+                    <Descriptions.Item
+                      label={`Vacaciones generadas no disfrutadas (${calculado.diasVacaciones.toFixed(3)} días)`}
+                    >
+                      <strong>{fmt(calculado.importeVacaciones)} €</strong>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Falta de preaviso">
+                      {aplicaPreaviso ? (
+                        <strong>{fmt(calculado.importePreaviso)} €</strong>
+                      ) : (
+                        <Text type="secondary">no procede</Text>
+                      )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Indemnización por extinción">
+                      {aplicaIndemnizacion ? (
+                        <strong>{fmt(calculado.importeIndemnizacion)} €</strong>
+                      ) : (
+                        <Text type="secondary">no procede</Text>
+                      )}
+                    </Descriptions.Item>
+                  </Descriptions>
+                  <Divider />
+                  <div style={{ textAlign: "right" }}>
+                    <Text strong style={{ fontSize: 18 }}>
+                      TOTAL: {fmt(calculado.total)} €
+                    </Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Días trabajados: {calculado.diasTrabajados} días naturales
+                    </Text>
+                  </div>
+                </>
+              ) : (
+                <Text type="secondary">
+                  Completa las fechas y el salario neto para ver el cálculo automático.
+                </Text>
+              )}
             </Card>
 
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
-                <Button type="primary" htmlType="submit" loading={loading}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  disabled={!calculado}
+                >
                   Generar Finiquito
                 </Button>
-                <Button onClick={() => form.resetFields()}>
+                <Button
+                  onClick={() => {
+                    form.resetFields();
+                    setCalculado(null);
+                    setAplicaPreaviso(false);
+                    setAplicaIndemnizacion(false);
+                  }}
+                >
                   Limpiar
                 </Button>
               </Space>
