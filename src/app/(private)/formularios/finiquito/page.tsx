@@ -129,7 +129,8 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
     importePreaviso = salarioDiarioNeto * diasSinPreaviso;
   }
 
-  const total = salarioPendiente + importeVacaciones + importeIndemnizacion + importePreaviso;
+  // Total finiquito: SOLO vacaciones + indemnización + preaviso (según Orden PJC/297/2026)
+  const total = importeVacaciones + importeIndemnizacion + importePreaviso;
 
   return {
     diasTrabajados,
@@ -245,14 +246,12 @@ export default function FiniquitoPage() {
         fechadesde: formatearFecha(values.fechadesde, "completaDel"),
         diasalario: formatearFecha(values.diasalario, "mesYDia"),
         fechasalariofinalconanio: formatearFecha(values.fechasalariofinalconanio, "completa"),
-        // campos existentes — ahora calculados automáticamente
-        monto1: calculado.salarioPendiente.toFixed(2),
-        monto2: calculado.importeVacaciones.toFixed(2),
-        total: calculado.total.toFixed(2),
-        // 3 campos nuevos para Make → SignNow
+        // Finiquito: 3 conceptos según Orden PJC/297/2026
         vacacionesdias: calculado.diasVacaciones.toFixed(3),
+        vacacionesimporte: calculado.importeVacaciones.toFixed(2),
         preaviso: aplicaPreaviso ? calculado.importePreaviso.toFixed(2) : "no procede",
         indemnizacion: aplicaIndemnizacion ? calculado.importeIndemnizacion.toFixed(2) : "no procede",
+        total: calculado.total.toFixed(2),
       };
 
       const response = await fetch(
@@ -565,15 +564,12 @@ export default function FiniquitoPage() {
               {calculado ? (
                 <>
                   <Descriptions column={1} bordered size="small">
-                    <Descriptions.Item label="Salario pendiente del período">
-                      <strong>{fmt(calculado.salarioPendiente)} €</strong>
-                    </Descriptions.Item>
                     <Descriptions.Item
-                      label={`Vacaciones generadas no disfrutadas (${calculado.diasVacaciones.toFixed(3)} días)`}
+                      label={`Vacaciones proporcionales (${calculado.diasVacaciones.toFixed(3)} días)`}
                     >
                       <strong>{fmt(calculado.importeVacaciones)} €</strong>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Falta de preaviso">
+                    <Descriptions.Item label="Compensación por falta de preaviso">
                       {aplicaPreaviso ? (
                         <strong>{fmt(calculado.importePreaviso)} €</strong>
                       ) : (
