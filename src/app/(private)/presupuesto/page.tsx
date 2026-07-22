@@ -26,6 +26,9 @@ const { Title, Text } = Typography;
 const DashboardPage = () => {
   const [form] = Form.useForm();
   const [loadingPDF, setLoadingPDF] = useState(false);
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(false);
+  const [numeroWhatsApp, setNumeroWhatsApp] = useState("");
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
   const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
   // Definir tipo para resultados
@@ -627,6 +630,42 @@ const DashboardPage = () => {
                     message.destroy("generating-pdf");
                     message.success("✓ PDF generado correctamente y descargado");
 
+                    // Enviar por WhatsApp si checkbox está marcado
+                    if (enviarWhatsApp && numeroWhatsApp.trim()) {
+                      try {
+                        setLoadingWhatsApp(true);
+                        message.loading({
+                          content: "Enviando por WhatsApp...",
+                          key: "sending-whatsapp",
+                        });
+
+                        const whatsappResponse = await api.post("/quotes", {
+                          ...payload,
+                          numeroWhatsApp: numeroWhatsApp.trim(),
+                        });
+
+                        if (whatsappResponse.data.success) {
+                          message.destroy("sending-whatsapp");
+                          message.success(
+                            `✓ Presupuesto enviado por WhatsApp a ${numeroWhatsApp}`
+                          );
+                        } else {
+                          message.destroy("sending-whatsapp");
+                          message.error(
+                            `Error al enviar WhatsApp: ${whatsappResponse.data.error}`
+                          );
+                        }
+                      } catch (err: unknown) {
+                        const error = err as Error;
+                        message.destroy("sending-whatsapp");
+                        message.error(
+                          `Error: ${error.message || "No se pudo enviar el mensaje"}`
+                        );
+                      } finally {
+                        setLoadingWhatsApp(false);
+                      }
+                    }
+
                     // Resetear todos los campos solo si el PDF se genera correctamente
                     form.resetFields();
                     setPrecioHora(0);
@@ -651,6 +690,8 @@ const DashboardPage = () => {
                     setCosteTortalEmpleador(0);
                     setPresupuestos([]);
                     setDesgloses({});
+                    setEnviarWhatsApp(false);
+                    setNumeroWhatsApp("");
                   } catch (err: unknown) {
                     const error = err as Error;
                     message.destroy("generating-pdf");
@@ -886,6 +927,40 @@ const DashboardPage = () => {
                   <Divider></Divider>
                   </div>
                 ))}
+
+                {/* Sección: Enviar por WhatsApp */}
+                <Card style={{ margin: "10px 0", background: "#f9f9f9" }}>
+                  <Form.Item name="enviarWhatsApp" valuePropName="checked">
+                    <Checkbox onChange={(e) => setEnviarWhatsApp(e.target.checked)}>
+                      ¿Enviar presupuesto por WhatsApp?
+                    </Checkbox>
+                  </Form.Item>
+
+                  {enviarWhatsApp && (
+                    <Form.Item
+                      label="Número de WhatsApp"
+                      name="numeroWhatsApp"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Ingresa un número de WhatsApp",
+                        },
+                        {
+                          pattern: /^(\+34|0034|34)?[6789]\d{8}$/,
+                          message:
+                            "Formato inválido. Usa +34 612345678 o 612345678",
+                        },
+                      ]}
+                    >
+                      <Input
+                        type="tel"
+                        placeholder="+34 612345678"
+                        onChange={(e) => setNumeroWhatsApp(e.target.value)}
+                      />
+                    </Form.Item>
+                  )}
+                </Card>
+
                 <Form.Item>
                   <Button
                     style={{
