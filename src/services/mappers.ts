@@ -52,7 +52,7 @@ export interface ContratoFormValues {
   numafiliaciontrabajador?: string;
   nivelformativotrabajador?: string;
   nacionalidadtrabajador?: string;
-  municipiodomtrabaajdor?: string;
+  municipiodomtrabajador?: string;
   paisdomtrabajador?: string;
   fechacontrato?: string;
   montobruto?: number;
@@ -75,7 +75,7 @@ export interface FiniquitoFormValues {
 }
 
 /**
- * Split apellidos into primer y segundo apellido
+ * Split apellidos into primer and segundo apellido
  * Splits on the first whitespace
  */
 function splitApellidos(apellidos: string): { primerApellido: string; segundoApellido: string } {
@@ -191,7 +191,7 @@ export function mapEmpleadoToDocumentosGrupo(
  * - fechaNacimiento (YYYY-MM-DD) → fechanactrabajador (dayjs object)
  * - nacionalidad → nacionalidadtrabajador
  * - nivelEstudios → nivelformativotrabajador
- * - municipio → municipiodomtrabaajdor
+ * - municipio → municipiodomtrabajador
  * - nacionalidad → paisdomtrabajador
  */
 export function mapEmpleadoToContrato(
@@ -227,7 +227,7 @@ export function mapEmpleadoToContrato(
   }
 
   if (data.municipio) {
-    result.municipiodomtrabaajdor = data.municipio;
+    result.municipiodomtrabajador = data.municipio;
   }
 
   return result;
@@ -273,6 +273,61 @@ export function mapEmpleadorToContrato(
 
   if (data.municipio) {
     result.municipio = data.municipio;
+  }
+
+  return result;
+}
+
+/**
+ * Map CloudNavis Empleado to Finiquito form values
+ *
+ * Mappings:
+ * - nombre + apellidos → nomempleada (concatenated with space)
+ * - dni → niempleada
+ * - email → correoempleada
+ */
+export function mapEmpleadoToFiniquito(
+  data: CloudnavisEmpleado
+): Partial<FiniquitoFormValues> {
+  const result: Partial<FiniquitoFormValues> = {};
+
+  if (data.nombre && data.apellidos) {
+    result.nomempleada = `${data.nombre} ${data.apellidos}`;
+  } else if (data.nombre) {
+    result.nomempleada = data.nombre;
+  }
+
+  if (data.dni) {
+    result.niempleada = data.dni;
+  }
+
+  if (data.email) {
+    result.correoempleada = data.email;
+  }
+
+  return result;
+}
+
+/**
+ * Map CloudNavis Empleador to Finiquito form values
+ *
+ * Mappings:
+ * - nombre + apellidos → nomempleador (concatenated with space)
+ * - email → correoempleador
+ */
+export function mapEmpleadorToFiniquito(
+  data: CloudnavisEmpleador
+): Partial<FiniquitoFormValues> {
+  const result: Partial<FiniquitoFormValues> = {};
+
+  if (data.nombre && data.apellidos) {
+    result.nomempleador = `${data.nombre} ${data.apellidos}`;
+  } else if (data.nombre) {
+    result.nomempleador = data.nombre;
+  }
+
+  if (data.email) {
+    result.correoempleador = data.email;
   }
 
   return result;
