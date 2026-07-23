@@ -60,7 +60,7 @@ export interface ContratoFormValues {
   mesfirma?: string;
   diafirma?: string;
   anofirma?: string;
-  fechanactrabajador?: string;
+  fechanactrabajador?: dayjs.Dayjs;
 }
 
 /**
@@ -214,7 +214,7 @@ export function mapEmpleadoToContrato(
   }
 
   if (data.fechaNacimiento) {
-    result.fechanactrabajador = data.fechaNacimiento;
+    result.fechanactrabajador = dayjs(data.fechaNacimiento, 'YYYY-MM-DD');
   }
 
   if (data.nacionalidad) {
