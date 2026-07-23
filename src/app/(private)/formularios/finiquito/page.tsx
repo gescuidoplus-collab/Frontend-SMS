@@ -27,6 +27,9 @@ import {
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
+import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
+import { mapEmpleadoToFiniquito, mapEmpleadorToFiniquito } from "@/services/mappers";
+import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
 
@@ -149,6 +152,7 @@ export default function FiniquitoPage() {
   const [aplicaPreaviso, setAplicaPreaviso] = useState(false);
   const [aplicaIndemnizacion, setAplicaIndemnizacion] = useState(false);
   const [calculado, setCalculado] = useState<Calculado | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -213,6 +217,64 @@ export default function FiniquitoPage() {
     setCalculado(calcularFiniquito(merged));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const idCliente = params.get("idCliente");
+    const token = params.get("token");
+
+    if (!idEmpleado || !idCliente || !token) {
+      return;
+    }
+
+    setLoading(true);
+    setErrorCode(null);
+
+    (async () => {
+      try {
+        const [empleado, empleador] = await Promise.all([
+          fetchCloudnavisEmpleado(idEmpleado, token),
+          fetchCloudnavisEmpleador(idCliente, token),
+        ]);
+
+        const mappedEmpleado = mapEmpleadoToFiniquito(empleado);
+        const mappedEmpleador = mapEmpleadorToFiniquito(empleador);
+
+        form.setFieldsValue({ ...mappedEmpleado, ...mappedEmpleador });
+        const merged = { ...form.getFieldsValue(), aplicaPreaviso, aplicaIndemnizacion };
+        setCalculado(calcularFiniquito(merged));
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "TOKEN_INVALID") {
+          setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "EMPLEADO_NOT_FOUND") {
+          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "EMPLEADOR_NOT_FOUND") {
+          setErrorCode("EMPLEADOR_NOT_FOUND");
+        } else if (error.message === "NETWORK_ERROR") {
+          setErrorCode("NETWORK_ERROR");
+        } else {
+          setErrorCode("MALFORMED_RESPONSE");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
+
+  const handleRetryFetch = () => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const idCliente = params.get("idCliente");
+    const token = params.get("token");
+
+    if (idEmpleado && idCliente && token) {
+      setErrorCode(null);
+      window.location.reload();
+    }
+  };
 
   const onValuesChange = (_: Partial<FormValues>, allValues: FormValues) => {
     const result = calcularFiniquito({
@@ -338,6 +400,13 @@ export default function FiniquitoPage() {
   };
 
   return (
+    <>
+      <CloudnavisErrorModal
+        visible={!!errorCode}
+        errorCode={errorCode || ""}
+        onRetry={handleRetryFetch}
+        onContinue={() => setErrorCode(null)}
+      />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
         <div style={{ padding: "24px", borderBottom: "1px solid #f0f0f0" }}>
@@ -628,5 +697,6 @@ export default function FiniquitoPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
