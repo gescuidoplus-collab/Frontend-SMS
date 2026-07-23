@@ -21,6 +21,9 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
+import { fetchCloudnavisEmpleado } from "@/services/cloudnavisClient";
+import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
+import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
 
@@ -63,100 +66,53 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
 export default function DocumentosGrupoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const prefill: Partial<FormValues> = {};
+    const idEmpleado = params.get("idEmpleado");
+    const token = params.get("token");
 
-    const fechaFirma = params.get("fechaFirma");
-    if (fechaFirma) {
-      const parsed = dayjs(fechaFirma, "YYYY-MM-DD", true);
-      if (parsed.isValid()) prefill.fechaFirma = parsed;
+    if (!idEmpleado || !token) {
+      return;
     }
 
-    const diaNacimiento = params.get("diaNacimiento");
-    if (diaNacimiento !== null) {
-      const num = Number(diaNacimiento);
-      if (!Number.isNaN(num)) prefill.diaNacimiento = num;
+    setLoading(true);
+    setErrorCode(null);
+
+    (async () => {
+      try {
+        const empleado = await fetchCloudnavisEmpleado(idEmpleado, token);
+        const mapped = mapEmpleadoToDocumentosGrupo(empleado);
+        form.setFieldsValue(mapped);
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "TOKEN_INVALID") {
+          setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "EMPLEADO_NOT_FOUND") {
+          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "NETWORK_ERROR") {
+          setErrorCode("NETWORK_ERROR");
+        } else {
+          setErrorCode("MALFORMED_RESPONSE");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [form]);
+
+  const handleRetryFetch = () => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const token = params.get("token");
+
+    if (idEmpleado && token) {
+      setErrorCode(null);
+      window.location.reload();
     }
-
-    const mesNacimiento = params.get("mesNacimiento");
-    if (mesNacimiento !== null) {
-      const num = Number(mesNacimiento);
-      if (!Number.isNaN(num)) prefill.mesNacimiento = num;
-    }
-
-    const anioNacimiento = params.get("anioNacimiento");
-    if (anioNacimiento !== null) {
-      const num = Number(anioNacimiento);
-      if (!Number.isNaN(num)) prefill.anioNacimiento = num;
-    }
-
-    const primerApellido = params.get("primerApellido");
-    if (primerApellido) prefill.primerApellido = primerApellido;
-
-    const segundoApellido = params.get("segundoApellido");
-    if (segundoApellido) prefill.segundoApellido = segundoApellido;
-
-    const nombres = params.get("nombres");
-    if (nombres) prefill.nombres = nombres;
-
-    const nif = params.get("nif");
-    if (nif) prefill.nif = nif;
-
-    const sexo = params.get("sexo");
-    if (sexo) prefill.sexo = sexo;
-
-    const numeroDocumento = params.get("numeroDocumento");
-    if (numeroDocumento) prefill.numeroDocumento = numeroDocumento;
-
-    const tipoDocumento = params.get("tipoDocumento");
-    if (tipoDocumento) prefill.tipoDocumento = tipoDocumento;
-
-    const tipoVia = params.get("tipoVia");
-    if (tipoVia) prefill.tipoVia = tipoVia;
-
-    const nombreVia = params.get("nombreVia");
-    if (nombreVia) prefill.nombreVia = nombreVia;
-
-    const bloque = params.get("bloque");
-    if (bloque) prefill.bloque = bloque;
-
-    const numero = params.get("numero");
-    if (numero) prefill.numero = numero;
-
-    const puerta = params.get("puerta");
-    if (puerta) prefill.puerta = puerta;
-
-    const codPostal = params.get("codPostal");
-    if (codPostal) prefill.codPostal = codPostal;
-
-    const municipio = params.get("municipio");
-    if (municipio) prefill.municipio = municipio;
-
-    const provincia = params.get("provincia");
-    if (provincia) prefill.provincia = provincia;
-
-    const pais = params.get("pais");
-    if (pais) prefill.pais = pais;
-
-    const codigoSwift = params.get("codigoSwift");
-    if (codigoSwift) prefill.codigoSwift = codigoSwift;
-
-    const numeroCuenta = params.get("numeroCuenta");
-    if (numeroCuenta) prefill.numeroCuenta = numeroCuenta;
-
-    const cuentaCotizacion = params.get("cuentaCotizacion");
-    if (cuentaCotizacion) prefill.cuentaCotizacion = cuentaCotizacion;
-
-    const lugarFirma = params.get("lugarFirma");
-    if (lugarFirma) prefill.lugarFirma = lugarFirma;
-
-    if (Object.keys(prefill).length === 0) return;
-    form.setFieldsValue(prefill);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -257,6 +213,13 @@ export default function DocumentosGrupoPage() {
   };
 
   return (
+    <>
+      <CloudnavisErrorModal
+        visible={!!errorCode}
+        errorCode={errorCode || ""}
+        onRetry={handleRetryFetch}
+        onContinue={() => setErrorCode(null)}
+      />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
         <div style={{ padding: "24px", borderBottom: "1px solid #f0f0f0" }}>
@@ -530,5 +493,6 @@ export default function DocumentosGrupoPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
