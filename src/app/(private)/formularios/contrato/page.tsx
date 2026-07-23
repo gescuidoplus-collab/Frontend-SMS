@@ -17,9 +17,12 @@ import {
   DatePicker,
 } from "antd";
 import { ArrowLeftOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
+import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
+import { mapEmpleadoToContrato, mapEmpleadorToContrato } from "@/services/mappers";
+import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
 
@@ -41,7 +44,7 @@ interface FormValues {
   numafiliaciontrabajador?: string;
   nivelformativotrabajador?: string;
   nacionalidadtrabajador?: string;
-  municipiodomtrabaajdor?: string;
+  municipiodomtrabajador?: string;
   paisdomtrabajador?: string;
   fechacontrato?: Dayjs;
   montobruto?: number;
@@ -64,103 +67,55 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
 export default function ContratoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const prefill: Partial<FormValues> = {};
+    const idEmpleado = params.get("idEmpleado");
+    const idCliente = params.get("idCliente");
+    const token = params.get("token");
 
-    const fechacontrato = params.get("fechacontrato");
-    if (fechacontrato) {
-      const parsed = dayjs(fechacontrato, "YYYY-MM-DD", true);
-      if (parsed.isValid()) prefill.fechacontrato = parsed;
+    if (!idEmpleado || !idCliente || !token) {
+      return;
     }
 
-    const fechanactrabajador = params.get("fechanactrabajador");
-    if (fechanactrabajador) {
-      const parsed = dayjs(fechanactrabajador, "YYYY-MM-DD", true);
-      if (parsed.isValid()) prefill.fechanactrabajador = parsed;
-    }
+    setLoading(true);
+    setErrorCode(null);
 
-    const montobruto = params.get("montobruto");
-    if (montobruto !== null) {
-      const num = Number(montobruto);
-      if (!Number.isNaN(num)) prefill.montobruto = num;
-    }
+    (async () => {
+      try {
+        const [empleado, empleador] = await Promise.all([
+          fetchCloudnavisEmpleado(idEmpleado, token),
+          fetchCloudnavisEmpleador(idCliente, token),
+        ]);
 
-    const nomempleador = params.get("nomempleador");
-    if (nomempleador) prefill.nomempleador = nomempleador;
+        const mappedEmpleado = mapEmpleadoToContrato(empleado);
+        const mappedEmpleador = mapEmpleadorToContrato(empleador);
 
-    const nifempleador = params.get("nifempleador");
-    if (nifempleador) prefill.nifempleador = nifempleador;
+        form.setFieldsValue({ ...mappedEmpleado, ...mappedEmpleador });
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "TOKEN_INVALID") {
+          setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "EMPLEADO_NOT_FOUND") {
+          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "EMPLEADOR_NOT_FOUND") {
+          setErrorCode("EMPLEADOR_NOT_FOUND");
+        } else if (error.message === "NETWORK_ERROR") {
+          setErrorCode("NETWORK_ERROR");
+        } else {
+          setErrorCode("MALFORMED_RESPONSE");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [form]);
 
-    const correoempleador = params.get("correoempleador");
-    if (correoempleador) prefill.correoempleador = correoempleador;
-
-    const regimen = params.get("regimen");
-    if (regimen) prefill.regimen = regimen;
-
-    const codigo = params.get("codigo");
-    if (codigo) prefill.codigo = codigo;
-
-    const prov = params.get("prov");
-    if (prov) prefill.prov = prov;
-
-    const numero = params.get("numero");
-    if (numero) prefill.numero = numero;
-
-    const dig = params.get("dig");
-    if (dig) prefill.dig = dig;
-
-    const contr = params.get("contr");
-    if (contr) prefill.contr = contr;
-
-    const domicilio = params.get("domicilio");
-    if (domicilio) prefill.domicilio = domicilio;
-
-    const municipio = params.get("municipio");
-    if (municipio) prefill.municipio = municipio;
-
-    const nombretrabajador = params.get("nombretrabajador");
-    if (nombretrabajador) prefill.nombretrabajador = nombretrabajador;
-
-    const niftrabajador = params.get("niftrabajador");
-    if (niftrabajador) prefill.niftrabajador = niftrabajador;
-
-    const correotrabajador = params.get("correotrabajador");
-    if (correotrabajador) prefill.correotrabajador = correotrabajador;
-
-    const numafiliaciontrabajador = params.get("numafiliaciontrabajador");
-    if (numafiliaciontrabajador) prefill.numafiliaciontrabajador = numafiliaciontrabajador;
-
-    const nivelformativotrabajador = params.get("nivelformativotrabajador");
-    if (nivelformativotrabajador) prefill.nivelformativotrabajador = nivelformativotrabajador;
-
-    const nacionalidadtrabajador = params.get("nacionalidadtrabajador");
-    if (nacionalidadtrabajador) prefill.nacionalidadtrabajador = nacionalidadtrabajador;
-
-    const municipiodomtrabaajdor = params.get("municipiodomtrabaajdor");
-    if (municipiodomtrabaajdor) prefill.municipiodomtrabaajdor = municipiodomtrabaajdor;
-
-    const paisdomtrabajador = params.get("paisdomtrabajador");
-    if (paisdomtrabajador) prefill.paisdomtrabajador = paisdomtrabajador;
-
-    const lugarfirma = params.get("lugarfirma");
-    if (lugarfirma) prefill.lugarfirma = lugarfirma;
-
-    const mesfirma = params.get("mesfirma");
-    if (mesfirma) prefill.mesfirma = mesfirma;
-
-    const diafirma = params.get("diafirma");
-    if (diafirma) prefill.diafirma = diafirma;
-
-    const anofirma = params.get("anofirma");
-    if (anofirma) prefill.anofirma = anofirma;
-
-    if (Object.keys(prefill).length === 0) return;
-    form.setFieldsValue(prefill);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleRetryFetch = () => {
+    window.location.reload();
+  };
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -186,7 +141,7 @@ export default function ContratoPage() {
         numafiliaciontrabajador: values.numafiliaciontrabajador || "",
         nivelformativotrabajador: values.nivelformativotrabajador || "",
         nacionalidadtrabajador: values.nacionalidadtrabajador || "",
-        municipiodomtrabaajdor: values.municipiodomtrabaajdor || "",
+        municipiodomtrabajador: values.municipiodomtrabajador || "",
         paisdomtrabajador: values.paisdomtrabajador || "",
         fechacontrato: formatearFecha(values.fechacontrato, "completa"),
         montobruto: values.montobruto?.toString() || "",
@@ -284,6 +239,13 @@ export default function ContratoPage() {
   };
 
   return (
+    <>
+      <CloudnavisErrorModal
+        visible={!!errorCode}
+        errorCode={errorCode || ""}
+        onRetry={handleRetryFetch}
+        onContinue={() => setErrorCode(null)}
+      />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
         <div style={{ padding: "24px", borderBottom: "1px solid #f0f0f0" }}>
@@ -502,7 +464,7 @@ export default function ContratoPage() {
                 <Col xs={24} sm={12}>
                   <Form.Item
                     label="Municipio de Domicilio"
-                    name="municipiodomtrabaajdor"
+                    name="municipiodomtrabajador"
                   >
                     <Input placeholder="Ej. Madrid" />
                   </Form.Item>
@@ -594,5 +556,6 @@ export default function ContratoPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
