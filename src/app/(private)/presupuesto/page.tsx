@@ -517,7 +517,11 @@ const DashboardPage = () => {
               <Form
                 form={form}
                 layout="vertical"
-                initialValues={{}}
+                initialValues={{
+                  considerationOne: "Salario según SMI (Salario Mínimo Interprofesional La cuota de la Seguridad Social y el SMI segun legislación)",
+                  considerationTwo: "Pagas Prorrateadas Incluidas. Vacaciones NO incluidas.",
+                  considerationThree: "Relalizacion de altas, bajas, contratos, nominas. Festivos NO incluidos",
+                }}
                 onFinish={async (values) => {
                   try {
                     setLoadingPDF(true);
@@ -679,32 +683,24 @@ const DashboardPage = () => {
                     ]}
                   />
                 </Form.Item>
-                <Divider>Horarios</Divider>
-                <Form.Item
-                  label="Horario a Convenir"
-                  name="horario_Convenir"
-                  rules={[{ required: true, message: "*Campo Obligatorio" }]}
-                >
-                  <Input type="text" style={{ width: "100%" }} placeholder="Ej: Lunes a Viernes, 9:00 AM - 5:00 PM" />
-                </Form.Item>
                 <Divider>Consideraciones adicionales</Divider>
                 <Form.Item
                     label="Consideracion 1 "
                     name="considerationOne"
                   >
-                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                    <Input.TextArea style={{ width: "100%" }} rows={3} />
                   </Form.Item>
                   <Form.Item
                     label="Consideracion 2 "
                     name="considerationTwo"
                   >
-                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                    <Input.TextArea style={{ width: "100%" }} rows={3} />
                   </Form.Item>
                   <Form.Item
                     label="Consideracion 3"
                     name="considerationThree"
                   >
-                    <Input type="text" style={{ width: "100%" }} step={1} value={""} />
+                    <Input.TextArea style={{ width: "100%" }} rows={3} />
                   </Form.Item>
 
                 <Divider>Desgloses de Presupuestos</Divider>
