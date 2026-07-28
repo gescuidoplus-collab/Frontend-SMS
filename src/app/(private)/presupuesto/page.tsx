@@ -29,8 +29,6 @@ const DashboardPage = () => {
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(false);
   const [numeroWhatsApp, setNumeroWhatsApp] = useState("");
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
-  const diasSeleccionados = Form.useWatch("Dias", form) || [];
-  const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
   // Definir tipo para resultados
   type ResultadosType = {
     sueldoNeto: number;
@@ -342,96 +340,6 @@ const DashboardPage = () => {
   };
 
   // ---------------- Horarios: helpers y validación ----------------
-  const DIAS = [
-    { key: "lunes", label: "Lunes" },
-    { key: "martes", label: "Martes" },
-    { key: "miercoles", label: "Miércoles" },
-    { key: "jueves", label: "Jueves" },
-    { key: "viernes", label: "Viernes" },
-    { key: "sabado", label: "Sábado" },
-    { key: "domingo", label: "Domingo" },
-  ];
-
-  // Define Moment-like interface for time objects
-  interface MomentLike {
-    format: (format: string) => string;
-    isBefore: (other: MomentLike) => boolean;
-  }
-
-  const rangoValido = (range: MomentLike[] | unknown): boolean => {
-    return (
-      Array.isArray(range) &&
-      range.length === 2 &&
-      range[0] &&
-      range[1] &&
-      typeof range[0]?.isBefore === "function" &&
-      range[0].isBefore(range[1])
-    );
-  };
-
-  interface FormValues {
-    Dias?: string[];
-    horarios?: Record<string, MomentLike[]>;
-    horarioGeneral?: MomentLike[];
-    inicio?: MomentLike;
-    final?: MomentLike;
-  }
-
-  const validarYNormalizarHorarios = (values: FormValues) => {
-    const seleccion: string[] = values?.Dias || [];
-    if (!Array.isArray(seleccion) || seleccion.length === 0) {
-      return {};
-    }
-
-    // Modo por-día (si existe 'horarios')
-    const horariosPorDia = values?.horarios;
-    if (horariosPorDia && typeof horariosPorDia === "object") {
-      const salida: Record<string, { inicio: string; fin: string } | null> = {};
-      for (const { key } of DIAS) {
-        const r = horariosPorDia[key];
-        if (seleccion.includes(key)) {
-          if (!rangoValido(r)) {
-            throw new Error(
-              `El día ${key} debe tener un rango válido (inicio < fin).`
-            );
-          }
-          salida[key] = {
-            inicio: r[0].format("HH:mm"),
-            fin: r[1].format("HH:mm"),
-          };
-        } else {
-          salida[key] = null;
-        }
-      }
-      return salida;
-    }
-
-    // Modo global (form actual): inicio/fin únicos
-    const inicio = values?.inicio;
-    const fin = values?.final;
-    if (
-      !inicio ||
-      !fin ||
-      typeof inicio?.isBefore !== "function" ||
-      !inicio.isBefore(fin)
-    ) {
-      throw new Error("Selecciona un horario global válido (inicio < fin).");
-    }
-
-    const salidaGlobal: Record<string, { inicio: string; fin: string } | null> =
-      {};
-    for (const { key } of DIAS) {
-      if (seleccion.includes(key)) {
-        salidaGlobal[key] = {
-          inicio: inicio.format("HH:mm"),
-          fin: fin.format("HH:mm"),
-        };
-      } else {
-        salidaGlobal[key] = null;
-      }
-    }
-    return salidaGlobal;
-  };
 
   return (
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
@@ -615,11 +523,8 @@ const DashboardPage = () => {
                     setLoadingPDF(true);
                     message.loading({ content: "Generando PDF...", key: "generating-pdf" });
 
-                    const horariosNormalizados =
-                      validarYNormalizarHorarios(values);
                     const payload = {
                       ...values,
-                      horarios: horariosNormalizados,
                       salarioNetoMensual,
                       presupuestos: presupuestos.map((p, index) => ({
                         numero: index + 1,
@@ -628,7 +533,6 @@ const DashboardPage = () => {
                         mensajesPresupuesto: mensajesPresupuesto[p.id] || "",
                         mensajesActivacion: mensajesActivacion[p.id] || "",
                       })),
-                      Dias: values.Dias || [],
                     };
                     console.log("Formulario OK:", payload);
 
@@ -776,102 +680,13 @@ const DashboardPage = () => {
                   />
                 </Form.Item>
                 <Divider>Horarios</Divider>
-                <Form.Item name="horarioConvenir" valuePropName="checked">
-                  <Checkbox>¿Quieres enviar un horario a convenir?</Checkbox>
-                </Form.Item>
-
-                {horarioConvenir && (
-                  <>
-                    <Form.Item
-                      label="Horario a Convenir"
-                      name="horario_Convenir"
-                      rules={[{ required: true,message:"*Campo Obligatorio"}]}
-                    >
-                      <Input type="text" style={{ width: "100%" }} step={1} />
-                    </Form.Item>
-                  </>
-                )}
-                {
-                  !horarioConvenir && (
-                    <>
-                      <Form.Item
-                  name="Dias"
-                  label="Dias"
-                  rules={[{ required: false }]}
+                <Form.Item
+                  label="Horario a Convenir"
+                  name="horario_Convenir"
+                  rules={[{ required: true, message: "*Campo Obligatorio" }]}
                 >
-                  <Checkbox.Group>
-                    <Row>
-                      <Col span={8}>
-                        <Checkbox value="lunes" style={{ lineHeight: "32px" }}>
-                          Lunes
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox value="martes" style={{ lineHeight: "32px" }}>
-                          Martes
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox
-                          value="miercoles"
-                          style={{ lineHeight: "32px" }}
-                        >
-                          Miercoles
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox value="jueves" style={{ lineHeight: "32px" }}>
-                          Jueves
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox
-                          value="viernes"
-                          style={{ lineHeight: "32px" }}
-                        >
-                          Viernes
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox value="sabado" style={{ lineHeight: "32px" }}>
-                          Sabado
-                        </Checkbox>
-                      </Col>
-                      <Col span={8}>
-                        <Checkbox
-                          value="domingo"
-                          style={{ lineHeight: "32px" }}
-                        >
-                          Domingo
-                        </Checkbox>
-                      </Col>
-                    </Row>
-                  </Checkbox.Group>
+                  <Input type="text" style={{ width: "100%" }} placeholder="Ej: Lunes a Viernes, 9:00 AM - 5:00 PM" />
                 </Form.Item>
-                <Row gutter={[16, 8]}>
-                  {DIAS.map(({ key, label }) => {
-                    const visible = diasSeleccionados.includes(key);
-                    if (!visible) return null;
-                    return (
-                      <Col span={12} key={key}>
-                        <Form.Item
-                          label={`Horario ${label}`}
-                          name={["horarios", key]}
-                          rules={[
-                            {
-                              required: false,
-                              validator: async (_, value) => {
-                                if (!diasSeleccionados.includes(key))
-                                  return Promise.resolve();
-                                if (value && !rangoValido(value)) {
-                                  return Promise.reject(
-                                    new Error("Selecciona un rango válido")
-                                  );
-                                }
-                                return Promise.resolve();
-                              },
-                            },
-                          ]}
                         >
                           <TimePicker.RangePicker
                             format="HH:mm"
