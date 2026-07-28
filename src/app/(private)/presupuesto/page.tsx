@@ -26,6 +26,9 @@ const { Title, Text } = Typography;
 const DashboardPage = () => {
   const [form] = Form.useForm();
   const [loadingPDF, setLoadingPDF] = useState(false);
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(false);
+  const [numeroWhatsApp, setNumeroWhatsApp] = useState("");
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
   const diasSeleccionados = Form.useWatch("Dias", form) || [];
   const horarioConvenir = Form.useWatch("horarioConvenir", form) || false;
   // Definir tipo para resultados
@@ -55,10 +58,10 @@ const DashboardPage = () => {
   const [mensajesActivacion, setMensajesActivacion] = useState<Record<number, string>>({});
 
   //VARIABLES INPUT
-  const [precioHora, setPrecioHora] = useState(0);
-  const [diasTrabajo, setDiasTrabajo] = useState(0);
-  const [horasDia, setHorasDia] = useState(0);
-  const [semanasAlMes, setSemanasAlMes] = useState(0);
+  const [precioHora, setPrecioHora] = useState(8.3);
+  const [diasTrabajo, setDiasTrabajo] = useState(5);
+  const [horasDia, setHorasDia] = useState(8);
+  const [semanasAlMes, setSemanasAlMes] = useState(4);
   const [salarioNetoManual, setSalarioNetoManual] = useState(0);
   const [precioServicio, setPrecioServicio] = useState(0);
 
@@ -114,65 +117,74 @@ const DashboardPage = () => {
     {
       key: "1",
       tramo: "1º",
-      retribucionMensual: "0.001€ - 319€/mes",
-      baseCotizacion: "296.00€",
-      empleador2360: "69.86€",
-      empleado637: "18.86€",
-      total: "84.27€",
+      retribucionMensual: "0,001€ - 329€/mes",
+      baseCotizacion: "305.00€",
+      empleador2360: "71.98€",
+      empleado637: "14.34€",
+      total: "86.83€",
     },
     {
       key: "2",
       tramo: "2º",
-      retribucionMensual: "319.01€ - 495€/mes",
-      baseCotizacion: "423.00€",
-      empleador2360: "99.83€",
-      empleado637: "26.95€",
-      total: "120.43€",
+      retribucionMensual: "329.01€ - 510€/mes",
+      baseCotizacion: "436.00€",
+      empleador2360: "102.90€",
+      empleado637: "20.49€",
+      total: "124.13€",
     },
     {
       key: "3",
       tramo: "3º",
-      retribucionMensual: "495.01€ - 672€/mes",
-      baseCotizacion: "584.00€",
-      empleador2360: "137.82€",
-      empleado637: "37.20€",
-      total: "166.26€",
+      retribucionMensual: "510.01€ - 693€/mes",
+      baseCotizacion: "602.00€",
+      empleador2360: "142.07€",
+      empleado637: "28.29€",
+      total: "171.39€",
     },
     {
       key: "4",
       tramo: "4º",
-      retribucionMensual: "672.01€ - 850€/mes",
-      baseCotizacion: "761.00€",
-      empleador2360: "179.60€",
-      empleado637: "48.48€",
-      total: "216.66€",
+      retribucionMensual: "693.01€ - 876€/mes",
+      baseCotizacion: "785.00€",
+      empleador2360: "185.26€",
+      empleado637: "36.90€",
+      total: "223.49€",
     },
     {
       key: "5",
       tramo: "5º",
-      retribucionMensual: "850.01€ - 1029€/mes",
-      baseCotizacion: "941.00€",
-      empleador2360: "222.08€",
-      empleado637: "59.94€",
-      total: "267.90€",
+      retribucionMensual: "876.01€ - 1061€/mes",
+      baseCotizacion: "970.00€",
+      empleador2360: "228.92€",
+      empleado637: "45.59€",
+      total: "276.16€",
     },
     {
       key: "6",
       tramo: "6º",
-      retribucionMensual: "1029.01€ - 1204€/mes",
-      baseCotizacion: "1116.00€",
-      empleador2360: "263.38€",
-      empleado637: "71.09€",
-      total: "317.73€",
+      retribucionMensual: "1061.01€ - 1241€/mes",
+      baseCotizacion: "1.151.00€",
+      empleador2360: "271.64€",
+      empleado637: "54.10€",
+      total: "327.69€",
     },
     {
       key: "7",
       tramo: "7º",
-      retribucionMensual: "1204.01€ - 1381.2€/mes",
-      baseCotizacion: "1381.20€",
-      empleador2360: "325.96€",
-      empleado637: "87.99€",
-      total: "393.23€",
+      retribucionMensual: "1241.01€ - 1424.50€/mes",
+      baseCotizacion: "1.424.50€",
+      empleador2360: "336.18€",
+      empleado637: "66.95€",
+      total: "405.56€",
+    },
+    {
+      key: "8",
+      tramo: "8º",
+      retribucionMensual: "1424.50€ en adelante",
+      baseCotizacion: "1.424.50€",
+      empleador2360: "336.18€",
+      empleado637: "66.95€",
+      total: "-€",
     },
   ];
 
@@ -255,69 +267,69 @@ const DashboardPage = () => {
   };
 
   const determinarTramo = (salario: number) => {
-    if (salario >= 0.001 && salario <= 319) {
+    if (salario >= 0.001 && salario <= 329) {
       return {
         tramo: 1,
-        baseCotizacion: 296.0,
-        empleador: 69.86,
-        empleado: 18.86,
-        total: 84.27,
+        baseCotizacion: 305.0,
+        empleador: 71.98,
+        empleado: 14.34,
+        total: 86.83,
       };
-    } else if (salario >= 319.01 && salario <= 495) {
+    } else if (salario >= 329.01 && salario <= 510) {
       return {
         tramo: 2,
-        baseCotizacion: 423.0,
-        empleador: 99.83,
-        empleado: 26.95,
-        total: 120.43,
+        baseCotizacion: 436.0,
+        empleador: 102.90,
+        empleado: 20.49,
+        total: 124.13,
       };
-    } else if (salario >= 495.01 && salario <= 672) {
+    } else if (salario >= 510.01 && salario <= 693) {
       return {
         tramo: 3,
-        baseCotizacion: 584.0,
-        empleador: 137.82,
-        empleado: 37.2,
-        total: 166.26,
+        baseCotizacion: 602.0,
+        empleador: 142.07,
+        empleado: 28.29,
+        total: 171.39,
       };
-    } else if (salario >= 672.01 && salario <= 850) {
+    } else if (salario >= 693.01 && salario <= 876) {
       return {
         tramo: 4,
-        baseCotizacion: 761.0,
-        empleador: 179.6,
-        empleado: 48.48,
-        total: 216.66,
+        baseCotizacion: 785.0,
+        empleador: 185.26,
+        empleado: 36.90,
+        total: 223.49,
       };
-    } else if (salario >= 850.01 && salario <= 1029) {
+    } else if (salario >= 876.01 && salario <= 1061) {
       return {
         tramo: 5,
-        baseCotizacion: 941.0,
-        empleador: 222.08,
-        empleado: 59.94,
-        total: 267.9,
+        baseCotizacion: 970.0,
+        empleador: 228.92,
+        empleado: 45.59,
+        total: 276.16,
       };
-    } else if (salario >= 1029.01 && salario <= 1204) {
+    } else if (salario >= 1061.01 && salario <= 1241) {
       return {
         tramo: 6,
-        baseCotizacion: 1116.0,
-        empleador: 263.38,
-        empleado: 71.09,
-        total: 317.73,
+        baseCotizacion: 1151.0,
+        empleador: 271.64,
+        empleado: 54.10,
+        total: 327.69,
       };
-    } else if (salario >= 1204.01 && salario <= 1381.2) {
+    } else if (salario >= 1241.01 && salario <= 1424.50) {
       return {
         tramo: 7,
-        baseCotizacion: 1381.2,
-        empleador: 325.96,
-        empleado: 87.99,
-        total: 393.23,
+        baseCotizacion: 1424.50,
+        empleador: 336.18,
+        empleado: 66.95,
+        total: 405.56,
       };
     } else {
       return {
-        tramo: 7,
-        baseCotizacion: 1381.2,
-        empleador: 325.96,
-        empleado: 87.99,
-        total: 393.23,
+        tramo: 8,
+        baseCotizacion: 1424.50,
+        empleador: 336.18,
+        empleado: 66.95,
+        total: 405.56,
       };
     }
   };
@@ -466,7 +478,8 @@ const DashboardPage = () => {
                     style={{ width: "100%", marginTop: 8 }}
                     min={0}
                     max={24}
-                    step={0.1}
+                    step={1}
+                    precision={0}
                     value={horasDia}
                     onChange={(value) => setHorasDia(value || 0)}
                   />
@@ -478,7 +491,8 @@ const DashboardPage = () => {
                     style={{ width: "100%", marginTop: 8 }}
                     min={0}
                     max={5}
-                    step={0.5}
+                    step={1}
+                    precision={0}
                     value={semanasAlMes}
                     onChange={(value) => setSemanasAlMes(value || 0)}
                   />
@@ -616,6 +630,42 @@ const DashboardPage = () => {
                     message.destroy("generating-pdf");
                     message.success("✓ PDF generado correctamente y descargado");
 
+                    // Enviar por WhatsApp si checkbox está marcado
+                    if (enviarWhatsApp && numeroWhatsApp.trim()) {
+                      try {
+                        setLoadingWhatsApp(true);
+                        message.loading({
+                          content: "Enviando por WhatsApp...",
+                          key: "sending-whatsapp",
+                        });
+
+                        const whatsappResponse = await api.post("/quotes", {
+                          ...payload,
+                          numeroWhatsApp: numeroWhatsApp.trim(),
+                        });
+
+                        if (whatsappResponse.data.success) {
+                          message.destroy("sending-whatsapp");
+                          message.success(
+                            `✓ Presupuesto enviado por WhatsApp a ${numeroWhatsApp}`
+                          );
+                        } else {
+                          message.destroy("sending-whatsapp");
+                          message.error(
+                            `Error al enviar WhatsApp: ${whatsappResponse.data.error}`
+                          );
+                        }
+                      } catch (err: unknown) {
+                        const error = err as Error;
+                        message.destroy("sending-whatsapp");
+                        message.error(
+                          `Error: ${error.message || "No se pudo enviar el mensaje"}`
+                        );
+                      } finally {
+                        setLoadingWhatsApp(false);
+                      }
+                    }
+
                     // Resetear todos los campos solo si el PDF se genera correctamente
                     form.resetFields();
                     setPrecioHora(0);
@@ -640,6 +690,8 @@ const DashboardPage = () => {
                     setCosteTortalEmpleador(0);
                     setPresupuestos([]);
                     setDesgloses({});
+                    setEnviarWhatsApp(false);
+                    setNumeroWhatsApp("");
                   } catch (err: unknown) {
                     const error = err as Error;
                     message.destroy("generating-pdf");
@@ -875,6 +927,40 @@ const DashboardPage = () => {
                   <Divider></Divider>
                   </div>
                 ))}
+
+                {/* Sección: Enviar por WhatsApp */}
+                <Card style={{ margin: "10px 0", background: "#f9f9f9" }}>
+                  <Form.Item name="enviarWhatsApp" valuePropName="checked">
+                    <Checkbox onChange={(e) => setEnviarWhatsApp(e.target.checked)}>
+                      ¿Enviar presupuesto por WhatsApp?
+                    </Checkbox>
+                  </Form.Item>
+
+                  {enviarWhatsApp && (
+                    <Form.Item
+                      label="Número de WhatsApp"
+                      name="numeroWhatsApp"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Ingresa un número de WhatsApp",
+                        },
+                        {
+                          pattern: /^(\+34|0034|34)?[6789]\d{8}$/,
+                          message:
+                            "Formato inválido. Usa +34 612345678 o 612345678",
+                        },
+                      ]}
+                    >
+                      <Input
+                        type="tel"
+                        placeholder="+34 612345678"
+                        onChange={(e) => setNumeroWhatsApp(e.target.value)}
+                      />
+                    </Form.Item>
+                  )}
+                </Card>
+
                 <Form.Item>
                   <Button
                     style={{

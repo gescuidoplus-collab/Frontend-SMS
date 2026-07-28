@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -17,9 +17,12 @@ import {
   DatePicker,
 } from "antd";
 import { ArrowLeftOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
+import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
+import { mapEmpleadoToContrato, mapEmpleadorToContrato } from "@/services/mappers";
+import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
 
@@ -41,7 +44,7 @@ interface FormValues {
   numafiliaciontrabajador?: string;
   nivelformativotrabajador?: string;
   nacionalidadtrabajador?: string;
-  municipiodomtrabaajdor?: string;
+  municipiodomtrabajador?: string;
   paisdomtrabajador?: string;
   fechacontrato?: Dayjs;
   montobruto?: number;
@@ -64,7 +67,55 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
 export default function ContratoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const idCliente = params.get("idCliente");
+    const token = params.get("token");
+
+    if (!idEmpleado || !idCliente || !token) {
+      return;
+    }
+
+    setLoading(true);
+    setErrorCode(null);
+
+    (async () => {
+      try {
+        const [empleado, empleador] = await Promise.all([
+          fetchCloudnavisEmpleado(idEmpleado, token),
+          fetchCloudnavisEmpleador(idCliente, token),
+        ]);
+
+        const mappedEmpleado = mapEmpleadoToContrato(empleado);
+        const mappedEmpleador = mapEmpleadorToContrato(empleador);
+
+        form.setFieldsValue({ ...mappedEmpleado, ...mappedEmpleador });
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "TOKEN_INVALID") {
+          setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "EMPLEADO_NOT_FOUND") {
+          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "EMPLEADOR_NOT_FOUND") {
+          setErrorCode("EMPLEADOR_NOT_FOUND");
+        } else if (error.message === "NETWORK_ERROR") {
+          setErrorCode("NETWORK_ERROR");
+        } else {
+          setErrorCode("MALFORMED_RESPONSE");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [form]);
+
+  const handleRetryFetch = () => {
+    window.location.reload();
+  };
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -90,7 +141,7 @@ export default function ContratoPage() {
         numafiliaciontrabajador: values.numafiliaciontrabajador || "",
         nivelformativotrabajador: values.nivelformativotrabajador || "",
         nacionalidadtrabajador: values.nacionalidadtrabajador || "",
-        municipiodomtrabaajdor: values.municipiodomtrabaajdor || "",
+        municipiodomtrabajador: values.municipiodomtrabajador || "",
         paisdomtrabajador: values.paisdomtrabajador || "",
         fechacontrato: formatearFecha(values.fechacontrato, "completa"),
         montobruto: values.montobruto?.toString() || "",
@@ -188,6 +239,13 @@ export default function ContratoPage() {
   };
 
   return (
+    <>
+      <CloudnavisErrorModal
+        visible={!!errorCode}
+        errorCode={errorCode || ""}
+        onRetry={handleRetryFetch}
+        onContinue={() => setErrorCode(null)}
+      />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
         <div style={{ padding: "24px", borderBottom: "1px solid #f0f0f0" }}>
@@ -406,7 +464,7 @@ export default function ContratoPage() {
                 <Col xs={24} sm={12}>
                   <Form.Item
                     label="Municipio de Domicilio"
-                    name="municipiodomtrabaajdor"
+                    name="municipiodomtrabajador"
                   >
                     <Input placeholder="Ej. Madrid" />
                   </Form.Item>
@@ -498,5 +556,6 @@ export default function ContratoPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -21,6 +21,9 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
+import { fetchCloudnavisEmpleado } from "@/services/cloudnavisClient";
+import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
+import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
 
@@ -63,7 +66,53 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
 export default function DocumentosGrupoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const token = params.get("token");
+
+    if (!idEmpleado || !token) {
+      return;
+    }
+
+    setLoading(true);
+    setErrorCode(null);
+
+    (async () => {
+      try {
+        const empleado = await fetchCloudnavisEmpleado(idEmpleado, token);
+        const mapped = mapEmpleadoToDocumentosGrupo(empleado);
+        form.setFieldsValue(mapped);
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === "TOKEN_INVALID") {
+          setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "EMPLEADO_NOT_FOUND") {
+          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "NETWORK_ERROR") {
+          setErrorCode("NETWORK_ERROR");
+        } else {
+          setErrorCode("MALFORMED_RESPONSE");
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [form]);
+
+  const handleRetryFetch = () => {
+    const params = new URLSearchParams(window.location.search);
+    const idEmpleado = params.get("idEmpleado");
+    const token = params.get("token");
+
+    if (idEmpleado && token) {
+      setErrorCode(null);
+      window.location.reload();
+    }
+  };
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -164,6 +213,13 @@ export default function DocumentosGrupoPage() {
   };
 
   return (
+    <>
+      <CloudnavisErrorModal
+        visible={!!errorCode}
+        errorCode={errorCode || ""}
+        onRetry={handleRetryFetch}
+        onContinue={() => setErrorCode(null)}
+      />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
         <div style={{ padding: "24px", borderBottom: "1px solid #f0f0f0" }}>
@@ -437,5 +493,6 @@ export default function DocumentosGrupoPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
