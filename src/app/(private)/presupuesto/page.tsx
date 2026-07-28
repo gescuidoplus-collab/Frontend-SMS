@@ -687,16 +687,6 @@ const DashboardPage = () => {
                 >
                   <Input type="text" style={{ width: "100%" }} placeholder="Ej: Lunes a Viernes, 9:00 AM - 5:00 PM" />
                 </Form.Item>
-                        >
-                          <TimePicker.RangePicker
-                            format="HH:mm"
-                            minuteStep={5}
-                          />
-                        </Form.Item>
-                      </Col>
-                    );
-                  })}
-                </Row>
                     </>
                   )
                 }
