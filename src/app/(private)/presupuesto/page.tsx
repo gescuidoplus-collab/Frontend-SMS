@@ -64,6 +64,7 @@ const DashboardPage = () => {
   const [semanasAlMes, setSemanasAlMes] = useState(4);
   const [salarioNetoManual, setSalarioNetoManual] = useState(0);
   const [precioServicio, setPrecioServicio] = useState(0);
+  const [cuotaActivacion, setCuotaActivacion] = useState(149);
 
   //Variables de resultados
   const [horasTotalesMensuales, setHorasTotalesMensuales] = useState(0);
@@ -220,6 +221,8 @@ const DashboardPage = () => {
     const precioIvaDescuento = precioServicio * 0.21;
     setIvaPrecioServicio(precioIvaDescuento);
 
+    const ivaActivacion = cuotaActivacion * 0.21;
+
     const costeTotalEmpleador =
       netoMensual + valoresTabla.total + (precioServicio + precioIvaDescuento);
     setCosteTortalEmpleador(costeTotalEmpleador);
@@ -229,6 +232,9 @@ const DashboardPage = () => {
       cuotaCuidoFam: Number((precioServicio + precioIvaDescuento).toFixed(2)),
       seguridadSocial: Number(valoresTabla.total.toFixed(2)),
       totalEmpleador: Number(costeTotalEmpleador.toFixed(2)),
+      cuotaActivacion: Number(cuotaActivacion.toFixed(2)),
+      ivaActivacion: Number(ivaActivacion.toFixed(2)),
+      cuotaActivacionConIva: Number((cuotaActivacion + ivaActivacion).toFixed(2)),
     };
 
     setResultadosActuales(resultadosFinales);
@@ -264,6 +270,7 @@ const DashboardPage = () => {
     setCotizacionTotal(0);
     setIvaPrecioServicio(0);
     setCosteTortalEmpleador(0);
+    setCuotaActivacion(149);
   };
 
   const determinarTramo = (salario: number) => {
@@ -521,6 +528,20 @@ const DashboardPage = () => {
                   />
                 </div>
 
+                <div>
+                  <Text>Cuota de Activación (€) - Por defecto 149€</Text>
+                  <InputNumber
+                    style={{ width: "100%", marginTop: 8 }}
+                    min={0}
+                    step={0.1}
+                    value={cuotaActivacion}
+                    onChange={(value) => setCuotaActivacion(value || 149)}
+                  />
+                  <Text type="secondary" style={{ fontSize: "12px", marginTop: "4px", display: "block" }}>
+                    IVA 21%: {(cuotaActivacion * 0.21).toFixed(2)}€ | Total: {(cuotaActivacion + cuotaActivacion * 0.21).toFixed(2)}€
+                  </Text>
+                </div>
+
                 <Space>
                   <Button
                     style={{
@@ -668,12 +689,13 @@ const DashboardPage = () => {
 
                     // Resetear todos los campos solo si el PDF se genera correctamente
                     form.resetFields();
-                    setPrecioHora(0);
-                    setDiasTrabajo(0);
-                    setHorasDia(0);
-                    setSemanasAlMes(0);
+                    setPrecioHora(8.3);
+                    setDiasTrabajo(5);
+                    setHorasDia(8);
+                    setSemanasAlMes(4);
                     setSalarioNetoManual(0);
                     setPrecioServicio(0);
+                    setCuotaActivacion(149);
 
                     setHorasTotalesMensuales(0);
                     setSalarioNetoMensual(0);
