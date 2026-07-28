@@ -683,14 +683,6 @@ const DashboardPage = () => {
                     ]}
                   />
                 </Form.Item>
-                <Divider>Horarios</Divider>
-                <Form.Item
-                  label="Horario a Convenir"
-                  name="horario_Convenir"
-                  rules={[{ required: true, message: "*Campo Obligatorio" }]}
-                >
-                  <Input type="text" style={{ width: "100%" }} placeholder="Ej: Lunes a Viernes, 9:00 AM - 5:00 PM" />
-                </Form.Item>
                 <Divider>Consideraciones adicionales</Divider>
                 <Form.Item
                     label="Consideracion 1 "
