@@ -766,15 +766,15 @@ const DashboardPage = () => {
                           message: "Ingresa un número de WhatsApp",
                         },
                         {
-                          pattern: /^(\+34|0034|34)?[6789]\d{8}$/,
+                          pattern: /^(\+\d{1,3}[\s-]?)?\d{6,14}$/,
                           message:
-                            "Formato inválido. Usa +34 612345678 o 612345678",
+                            "Formato inválido. Usa +34 612345678, +58 4121234567, o 612345678",
                         },
                       ]}
                     >
                       <Input
                         type="tel"
-                        placeholder="+34 612345678"
+                        placeholder="+34 612345678 o +58 4121234567"
                         onChange={(e) => setNumeroWhatsApp(e.target.value)}
                       />
                     </Form.Item>
