@@ -524,8 +524,24 @@ const DashboardPage = () => {
                 }}
                 onFinish={async (values) => {
                   try {
+                    // Validar campos requeridos
+                    if (!values.nameContrato?.trim()) {
+                      message.error("❌ El nombre del contrato es requerido");
+                      return;
+                    }
+
+                    if (presupuestos.length === 0) {
+                      message.error("❌ Debes agregar al menos un presupuesto");
+                      return;
+                    }
+
+                    if (enviarWhatsApp && !numeroWhatsApp.trim()) {
+                      message.error("❌ Si quieres enviar por WhatsApp, ingresa un número válido");
+                      return;
+                    }
+
                     setLoadingPDF(true);
-                    message.loading({ content: "Generando PDF...", key: "generating-pdf" });
+                    message.loading({ content: "📄 Generando PDF...", key: "generating-pdf" });
 
                     const payload = {
                       ...values,
@@ -538,7 +554,7 @@ const DashboardPage = () => {
                         mensajesActivacion: mensajesActivacion[p.id] || "",
                       })),
                     };
-                    console.log("Formulario OK:", payload);
+                    console.log("✓ Formulario validado:", payload);
 
                     const response = await api.post("/generate-pdf", payload, {
                       responseType: "blob", // IMPORTANTE: Para recibir archivos binarios
@@ -560,35 +576,48 @@ const DashboardPage = () => {
                     message.success("✓ PDF generado correctamente y descargado");
 
                     // Enviar por WhatsApp si checkbox está marcado
-                    if (enviarWhatsApp && numeroWhatsApp.trim()) {
+                    if (enviarWhatsApp) {
+                      const numLimpio = numeroWhatsApp.replace(/[\s\-\(\)]/g, "");
+                      const isValidPhone = /^(\+\d{1,3})?\d{8,14}$/.test(numLimpio) && numLimpio.length >= 9;
+
+                      if (!numeroWhatsApp.trim()) {
+                        message.error("❌ Por favor ingresa un número de WhatsApp");
+                        return;
+                      }
+
+                      if (!isValidPhone) {
+                        message.error("❌ Número de WhatsApp inválido. Verifica el formato");
+                        return;
+                      }
+
                       try {
                         setLoadingWhatsApp(true);
                         message.loading({
-                          content: "Enviando por WhatsApp...",
+                          content: "📱 Enviando por WhatsApp...",
                           key: "sending-whatsapp",
                         });
 
                         const whatsappResponse = await api.post("/quotes", {
                           ...payload,
-                          numeroWhatsApp: numeroWhatsApp.trim(),
+                          numeroWhatsApp: numLimpio,
                         });
 
+                        message.destroy("sending-whatsapp");
+
                         if (whatsappResponse.data.success) {
-                          message.destroy("sending-whatsapp");
                           message.success(
                             `✓ Presupuesto enviado por WhatsApp a ${numeroWhatsApp}`
                           );
                         } else {
-                          message.destroy("sending-whatsapp");
                           message.error(
-                            `Error al enviar WhatsApp: ${whatsappResponse.data.error}`
+                            `❌ Error: ${whatsappResponse.data.error || "No se pudo enviar"}`
                           );
                         }
                       } catch (err: unknown) {
                         const error = err as Error;
                         message.destroy("sending-whatsapp");
                         message.error(
-                          `Error: ${error.message || "No se pudo enviar el mensaje"}`
+                          `❌ Error: ${error.message || "No se pudo enviar el mensaje"}`
                         );
                       } finally {
                         setLoadingWhatsApp(false);
@@ -749,35 +778,110 @@ const DashboardPage = () => {
                 ))}
 
                 {/* Sección: Enviar por WhatsApp */}
-                <Card style={{ margin: "10px 0", background: "#f9f9f9" }}>
+                <Card
+                  style={{
+                    margin: "20px 0",
+                    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+                    border: "2px solid #e0e7ff",
+                    borderRadius: "12px"
+                  }}
+                >
                   <Form.Item name="enviarWhatsApp" valuePropName="checked">
-                    <Checkbox onChange={(e) => setEnviarWhatsApp(e.target.checked)}>
-                      ¿Enviar presupuesto por WhatsApp?
+                    <Checkbox
+                      onChange={(e) => {
+                        setEnviarWhatsApp(e.target.checked);
+                        if (!e.target.checked) setNumeroWhatsApp("");
+                      }}
+                      style={{ fontSize: "16px", fontWeight: "600" }}
+                    >
+                      📱 Enviar presupuesto por WhatsApp
                     </Checkbox>
                   </Form.Item>
 
                   {enviarWhatsApp && (
-                    <Form.Item
-                      label="Número de WhatsApp"
-                      name="numeroWhatsApp"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Ingresa un número de WhatsApp",
-                        },
-                        {
-                          pattern: /^(\+\d{1,3}[\s-]?)?\d{6,14}$/,
-                          message:
-                            "Formato inválido. Usa +34 612345678, +58 4121234567, o 612345678",
-                        },
-                      ]}
-                    >
-                      <Input
-                        type="tel"
-                        placeholder="+34 612345678 o +58 4121234567"
-                        onChange={(e) => setNumeroWhatsApp(e.target.value)}
-                      />
-                    </Form.Item>
+                    <Space direction="vertical" style={{ width: "100%", marginTop: "16px" }} size="large">
+                      <Row gutter={12}>
+                        <Col span={8}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: "600", color: "#1f2937" }}>Código país</span>}
+                            name="codigoWhatsApp"
+                            initialValue="+34"
+                          >
+                            <Select
+                              options={[
+                                { label: "🇪🇸 +34", value: "+34" },
+                                { label: "🇻🇪 +58", value: "+58" },
+                                { label: "🇨🇴 +57", value: "+57" },
+                                { label: "🇦🇷 +54", value: "+54" },
+                                { label: "🇲🇽 +52", value: "+52" },
+                                { label: "🇨🇱 +56", value: "+56" },
+                                { label: "🇵🇪 +51", value: "+51" },
+                                { label: "🇪🇨 +593", value: "+593" },
+                                { label: "🇧🇴 +591", value: "+591" },
+                                { label: "🇵🇾 +595", value: "+595" },
+                                { label: "🇺🇾 +598", value: "+598" },
+                                { label: "🇧🇷 +55", value: "+55" },
+                                { label: "🇵🇦 +507", value: "+507" },
+                                { label: "🇨🇷 +506", value: "+506" },
+                                { label: "🇬🇹 +502", value: "+502" },
+                                { label: "🇸🇻 +503", value: "+503" },
+                                { label: "🇭🇳 +504", value: "+504" },
+                                { label: "🇳🇮 +505", value: "+505" },
+                                { label: "🇨🇺 +53", value: "+53" },
+                                { label: "🇫🇷 +33", value: "+33" },
+                                { label: "🇵🇹 +351", value: "+351" },
+                                { label: "🇮🇹 +39", value: "+39" },
+                                { label: "🇩🇪 +49", value: "+49" },
+                                { label: "🇬🇧 +44", value: "+44" },
+                                { label: "🇺🇸/🇨🇦/🇩🇴 +1", value: "+1" },
+                              ]}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col span={16}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: "600", color: "#1f2937" }}>Número</span>}
+                            name="numeroWhatsApp"
+                            rules={[
+                              {
+                                required: enviarWhatsApp,
+                                message: "Número requerido",
+                              },
+                              {
+                                validator: (_, value) => {
+                                  if (!value) return Promise.resolve();
+                                  const cleanNum = value.replace(/[\s\-\(\)]/g, "");
+                                  if (!/^\d{8,14}$/.test(cleanNum)) {
+                                    return Promise.reject(new Error("8-14 dígitos"));
+                                  }
+                                  return Promise.resolve();
+                                },
+                              },
+                            ]}
+                          >
+                            <Input
+                              type="tel"
+                              placeholder="612345678"
+                              onChange={(e) => {
+                                const codigo = form.getFieldValue("codigoWhatsApp") || "+34";
+                                const num = e.target.value.replace(/[\s\-\(\)]/g, "");
+                                setNumeroWhatsApp(`${codigo}${num}`);
+                              }}
+                              style={{
+                                padding: "10px 12px",
+                                fontSize: "15px",
+                                borderRadius: "8px"
+                              }}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Text type="secondary" style={{ fontSize: "13px", display: "block" }}>
+                        ✓ Selecciona el código de tu país y escribe el número
+                      </Text>
+                    </Space>
                   )}
                 </Card>
 
