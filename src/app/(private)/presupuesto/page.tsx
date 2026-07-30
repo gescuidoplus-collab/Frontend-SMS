@@ -29,6 +29,10 @@ const DashboardPage = () => {
   const [enviarWhatsApp, setEnviarWhatsApp] = useState(false);
   const [numeroWhatsApp, setNumeroWhatsApp] = useState("");
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [whatsappProgress, setWhatsappProgress] = useState(0);
+  const [trackingStatus, setTrackingStatus] = useState<"idle" | "sending" | "tracking" | "delivered" | "failed" | "timeout">("idle");
+  const [trackingData, setTrackingData] = useState<any>(null);
+  const [trackingError, setTrackingError] = useState<string>("");
   // Definir tipo para resultados
   type ResultadosType = {
     sueldoNeto: number;
@@ -592,9 +596,14 @@ const DashboardPage = () => {
 
                       try {
                         setLoadingWhatsApp(true);
-                        message.loading({
-                          content: "📱 Enviando por WhatsApp...",
-                          key: "sending-whatsapp",
+                        setTrackingStatus("sending");
+                        setWhatsappProgress(10);
+                        setTrackingError("");
+                        setTrackingData({
+                          nombreCliente: values.nameContrato,
+                          numeroDestino: numeroWhatsApp,
+                          presupuestosCount: presupuestos.length,
+                          fechaEnvio: new Date().toLocaleString("es-ES"),
                         });
 
                         const whatsappResponse = await api.post("/quotes", {
@@ -602,24 +611,66 @@ const DashboardPage = () => {
                           numeroWhatsApp: numLimpio,
                         });
 
-                        message.destroy("sending-whatsapp");
-
                         if (whatsappResponse.data.success) {
-                          message.success(
-                            `✓ Presupuesto enviado por WhatsApp a ${numeroWhatsApp}`
-                          );
+                          const messageId = whatsappResponse.data.messageId;
+                          setTrackingStatus("tracking");
+                          setWhatsappProgress(25);
+
+                          // Polling para monitorear estado del mensaje (máx 1 minuto)
+                          let attempts = 0;
+                          const maxAttempts = 12; // 12 * 5 segundos = 60 segundos
+                          const pollInterval = setInterval(async () => {
+                            attempts++;
+                            const progressIncrement = (75 / maxAttempts);
+                            setWhatsappProgress(prev => Math.min(prev + progressIncrement, 95));
+
+                            try {
+                              const statusResponse = await api.get(
+                                `/quotes/${messageId}/status`
+                              );
+
+                              if (statusResponse.data.success) {
+                                const status = statusResponse.data.status;
+
+                                if (status === "delivered") {
+                                  setWhatsappProgress(100);
+                                  setTrackingStatus("delivered");
+                                  clearInterval(pollInterval);
+                                  setTimeout(() => setLoadingWhatsApp(false), 2000);
+                                } else if (status === "sent") {
+                                  setTrackingStatus("tracking");
+                                } else if (
+                                  status === "failed" ||
+                                  statusResponse.data.errorCode
+                                ) {
+                                  setTrackingStatus("failed");
+                                  setTrackingError(statusResponse.data.errorMessage || "Error desconocido");
+                                  clearInterval(pollInterval);
+                                  setTimeout(() => setLoadingWhatsApp(false), 2000);
+                                }
+
+                                if (attempts >= maxAttempts) {
+                                  setTrackingStatus("timeout");
+                                  setWhatsappProgress(100);
+                                  clearInterval(pollInterval);
+                                  setTimeout(() => setLoadingWhatsApp(false), 2000);
+                                }
+                              }
+                            } catch (pollErr) {
+                              if (attempts >= maxAttempts) {
+                                clearInterval(pollInterval);
+                              }
+                            }
+                          }, 5000); // Polling cada 5 segundos
                         } else {
-                          message.error(
-                            `❌ Error: ${whatsappResponse.data.error || "No se pudo enviar"}`
-                          );
+                          setTrackingStatus("failed");
+                          setTrackingError(whatsappResponse.data.error || "Error desconocido");
+                          setLoadingWhatsApp(false);
                         }
                       } catch (err: unknown) {
                         const error = err as Error;
-                        message.destroy("sending-whatsapp");
-                        message.error(
-                          `❌ Error: ${error.message || "No se pudo enviar el mensaje"}`
-                        );
-                      } finally {
+                        setTrackingStatus("failed");
+                        setTrackingError(error.message || "No se pudo conectar con el servidor");
                         setLoadingWhatsApp(false);
                       }
                     }
@@ -903,6 +954,111 @@ const DashboardPage = () => {
                     {loadingPDF ? "Generando PDF..." : "Generar PDF"}
                   </Button>
                 </Form.Item>
+
+                {trackingStatus !== "idle" && (
+                  <Card
+                    style={{
+                      marginTop: "20px",
+                      background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                      border: "2px solid #0ea5e9",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    <Flex vertical gap={16}>
+                      <div>
+                        <Flex justify="space-between" align="center" style={{ marginBottom: "8px" }}>
+                          <Text strong style={{ fontSize: "14px" }}>
+                            {trackingStatus === "sending" && "📱 Enviando mensaje..."}
+                            {trackingStatus === "tracking" && "📱 Rastreando estado..."}
+                            {trackingStatus === "delivered" && "✅ Presupuesto entregado"}
+                            {trackingStatus === "failed" && "❌ Falló el envío"}
+                            {trackingStatus === "timeout" && "⏱️ Timeout - Sin respuesta"}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: "12px" }}>
+                            {whatsappProgress}%
+                          </Text>
+                        </Flex>
+                        <div
+                          style={{
+                            height: "8px",
+                            background: "#e0e7ff",
+                            borderRadius: "4px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              background:
+                                trackingStatus === "delivered"
+                                  ? "linear-gradient(90deg, #10b981 0%, #059669 100%)"
+                                  : trackingStatus === "failed"
+                                  ? "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)"
+                                  : trackingStatus === "timeout"
+                                  ? "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)"
+                                  : "linear-gradient(90deg, #0ea5e9 0%, #0284c7 100%)",
+                              width: `${whatsappProgress}%`,
+                              transition: "width 0.3s ease",
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {trackingData && (
+                        <Card size="small" style={{ background: "rgba(255,255,255,0.6)" }}>
+                          <Flex vertical gap={8}>
+                            <Flex justify="space-between">
+                              <Text type="secondary" style={{ fontSize: "12px" }}>
+                                Cliente:
+                              </Text>
+                              <Text strong style={{ fontSize: "12px" }}>
+                                {trackingData.nombreCliente}
+                              </Text>
+                            </Flex>
+                            <Flex justify="space-between">
+                              <Text type="secondary" style={{ fontSize: "12px" }}>
+                                Destino:
+                              </Text>
+                              <Text strong style={{ fontSize: "12px" }}>
+                                {trackingData.numeroDestino}
+                              </Text>
+                            </Flex>
+                            <Flex justify="space-between">
+                              <Text type="secondary" style={{ fontSize: "12px" }}>
+                                Presupuestos:
+                              </Text>
+                              <Text strong style={{ fontSize: "12px" }}>
+                                {trackingData.presupuestosCount}
+                              </Text>
+                            </Flex>
+                            <Flex justify="space-between">
+                              <Text type="secondary" style={{ fontSize: "12px" }}>
+                                Enviado:
+                              </Text>
+                              <Text strong style={{ fontSize: "12px" }}>
+                                {trackingData.fechaEnvio}
+                              </Text>
+                            </Flex>
+                          </Flex>
+                        </Card>
+                      )}
+
+                      {trackingError && (
+                        <Card
+                          size="small"
+                          style={{
+                            background: "rgba(239, 68, 68, 0.1)",
+                            borderLeft: "4px solid #ef4444",
+                          }}
+                        >
+                          <Text type="danger" style={{ fontSize: "12px" }}>
+                            {trackingError}
+                          </Text>
+                        </Card>
+                      )}
+                    </Flex>
+                  </Card>
+                )}
               </Form>
             </Card>
           </Card>
