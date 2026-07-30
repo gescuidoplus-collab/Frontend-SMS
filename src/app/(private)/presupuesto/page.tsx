@@ -954,16 +954,17 @@ const DashboardPage = () => {
                     {loadingPDF ? "Generando PDF..." : "Generar PDF"}
                   </Button>
                 </Form.Item>
+              </Form>
 
-                {trackingStatus !== "idle" && (
-                  <Card
-                    style={{
-                      marginTop: "20px",
-                      background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
-                      border: "2px solid #0ea5e9",
-                      borderRadius: "12px",
-                    }}
-                  >
+              {trackingStatus !== "idle" && (
+                <Card
+                  style={{
+                    marginTop: "20px",
+                    background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
+                    border: "2px solid #0ea5e9",
+                    borderRadius: "12px",
+                  }}
+                >
                     <Flex vertical gap={16}>
                       <div>
                         <Flex justify="space-between" align="center" style={{ marginBottom: "8px" }}>
@@ -1059,7 +1060,6 @@ const DashboardPage = () => {
                     </Flex>
                   </Card>
                 )}
-              </Form>
             </Card>
           </Card>
 
