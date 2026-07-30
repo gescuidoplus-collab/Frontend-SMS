@@ -31,7 +31,12 @@ const DashboardPage = () => {
   const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
   const [whatsappProgress, setWhatsappProgress] = useState(0);
   const [trackingStatus, setTrackingStatus] = useState<"idle" | "sending" | "tracking" | "delivered" | "failed" | "timeout">("idle");
-  const [trackingData, setTrackingData] = useState<any>(null);
+  const [trackingData, setTrackingData] = useState<{
+    nombreCliente: string;
+    numeroDestino: string;
+    presupuestosCount: number;
+    fechaEnvio: string;
+  } | null>(null);
   const [trackingError, setTrackingError] = useState<string>("");
   // Definir tipo para resultados
   type ResultadosType = {
