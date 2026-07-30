@@ -524,8 +524,24 @@ const DashboardPage = () => {
                 }}
                 onFinish={async (values) => {
                   try {
+                    // Validar campos requeridos
+                    if (!values.nameContrato?.trim()) {
+                      message.error("❌ El nombre del contrato es requerido");
+                      return;
+                    }
+
+                    if (presupuestos.length === 0) {
+                      message.error("❌ Debes agregar al menos un presupuesto");
+                      return;
+                    }
+
+                    if (enviarWhatsApp && !numeroWhatsApp.trim()) {
+                      message.error("❌ Si quieres enviar por WhatsApp, ingresa un número válido");
+                      return;
+                    }
+
                     setLoadingPDF(true);
-                    message.loading({ content: "Generando PDF...", key: "generating-pdf" });
+                    message.loading({ content: "📄 Generando PDF...", key: "generating-pdf" });
 
                     const payload = {
                       ...values,
@@ -538,7 +554,7 @@ const DashboardPage = () => {
                         mensajesActivacion: mensajesActivacion[p.id] || "",
                       })),
                     };
-                    console.log("Formulario OK:", payload);
+                    console.log("✓ Formulario validado:", payload);
 
                     const response = await api.post("/generate-pdf", payload, {
                       responseType: "blob", // IMPORTANTE: Para recibir archivos binarios
@@ -560,35 +576,48 @@ const DashboardPage = () => {
                     message.success("✓ PDF generado correctamente y descargado");
 
                     // Enviar por WhatsApp si checkbox está marcado
-                    if (enviarWhatsApp && numeroWhatsApp.trim()) {
+                    if (enviarWhatsApp) {
+                      const numLimpio = numeroWhatsApp.replace(/[\s\-\(\)]/g, "");
+                      const isValidPhone = /^(\+\d{1,3})?\d{8,14}$/.test(numLimpio) && numLimpio.length >= 9;
+
+                      if (!numeroWhatsApp.trim()) {
+                        message.error("❌ Por favor ingresa un número de WhatsApp");
+                        return;
+                      }
+
+                      if (!isValidPhone) {
+                        message.error("❌ Número de WhatsApp inválido. Verifica el formato");
+                        return;
+                      }
+
                       try {
                         setLoadingWhatsApp(true);
                         message.loading({
-                          content: "Enviando por WhatsApp...",
+                          content: "📱 Enviando por WhatsApp...",
                           key: "sending-whatsapp",
                         });
 
                         const whatsappResponse = await api.post("/quotes", {
                           ...payload,
-                          numeroWhatsApp: numeroWhatsApp.trim(),
+                          numeroWhatsApp: numLimpio,
                         });
 
+                        message.destroy("sending-whatsapp");
+
                         if (whatsappResponse.data.success) {
-                          message.destroy("sending-whatsapp");
                           message.success(
                             `✓ Presupuesto enviado por WhatsApp a ${numeroWhatsApp}`
                           );
                         } else {
-                          message.destroy("sending-whatsapp");
                           message.error(
-                            `Error al enviar WhatsApp: ${whatsappResponse.data.error}`
+                            `❌ Error: ${whatsappResponse.data.error || "No se pudo enviar"}`
                           );
                         }
                       } catch (err: unknown) {
                         const error = err as Error;
                         message.destroy("sending-whatsapp");
                         message.error(
-                          `Error: ${error.message || "No se pudo enviar el mensaje"}`
+                          `❌ Error: ${error.message || "No se pudo enviar el mensaje"}`
                         );
                       } finally {
                         setLoadingWhatsApp(false);
@@ -749,35 +778,98 @@ const DashboardPage = () => {
                 ))}
 
                 {/* Sección: Enviar por WhatsApp */}
-                <Card style={{ margin: "10px 0", background: "#f9f9f9" }}>
+                <Card
+                  style={{
+                    margin: "20px 0",
+                    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+                    border: "2px solid #e0e7ff",
+                    borderRadius: "12px"
+                  }}
+                >
                   <Form.Item name="enviarWhatsApp" valuePropName="checked">
-                    <Checkbox onChange={(e) => setEnviarWhatsApp(e.target.checked)}>
-                      ¿Enviar presupuesto por WhatsApp?
+                    <Checkbox
+                      onChange={(e) => {
+                        setEnviarWhatsApp(e.target.checked);
+                        if (!e.target.checked) setNumeroWhatsApp("");
+                      }}
+                      style={{ fontSize: "16px", fontWeight: "600" }}
+                    >
+                      📱 Enviar presupuesto por WhatsApp
                     </Checkbox>
                   </Form.Item>
 
                   {enviarWhatsApp && (
-                    <Form.Item
-                      label="Número de WhatsApp"
-                      name="numeroWhatsApp"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Ingresa un número de WhatsApp",
-                        },
-                        {
-                          pattern: /^(\+\d{1,3}[\s-]?)?\d{6,14}$/,
-                          message:
-                            "Formato inválido. Usa +34 612345678, +58 4121234567, o 612345678",
-                        },
-                      ]}
-                    >
-                      <Input
-                        type="tel"
-                        placeholder="+34 612345678 o +58 4121234567"
-                        onChange={(e) => setNumeroWhatsApp(e.target.value)}
-                      />
-                    </Form.Item>
+                    <Space direction="vertical" style={{ width: "100%", marginTop: "16px" }} size="large">
+                      <Form.Item
+                        label={<span style={{ fontWeight: "600", color: "#1f2937" }}>Seleccionar número</span>}
+                        name="numeroWhatsAppSelect"
+                      >
+                        <Select
+                          placeholder="Elige un número guardado o ingresa uno nuevo"
+                          allowClear
+                          onChange={(value) => {
+                            if (value) setNumeroWhatsApp(value);
+                          }}
+                          options={(() => {
+                            const saved = JSON.parse(localStorage.getItem("whatsappNumbers") || "[]");
+                            return saved.map((num: string) => ({ label: num, value: num }));
+                          })()}
+                        />
+                      </Form.Item>
+
+                      <Form.Item
+                        label={<span style={{ fontWeight: "600", color: "#1f2937" }}>O ingresa un nuevo número</span>}
+                        name="numeroWhatsApp"
+                        rules={[
+                          {
+                            required: enviarWhatsApp,
+                            message: "Número de WhatsApp requerido",
+                          },
+                          {
+                            validator: (_, value) => {
+                              if (!value) return Promise.resolve();
+
+                              const cleanNum = value.replace(/[\s\-\(\)]/g, "");
+                              const isValid = /^(\+\d{1,3})?\d{8,14}$/.test(cleanNum) && cleanNum.length >= 9;
+
+                              if (!isValid) {
+                                return Promise.reject(
+                                  new Error("Formato inválido. Usa: +34612345678 o 612345678")
+                                );
+                              }
+                              return Promise.resolve();
+                            },
+                          },
+                        ]}
+                      >
+                        <Input
+                          type="tel"
+                          placeholder="+34 612345678 o 612345678"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setNumeroWhatsApp(value);
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value.trim();
+                            if (value && !JSON.parse(localStorage.getItem("whatsappNumbers") || "[]").includes(value)) {
+                              const saved = JSON.parse(localStorage.getItem("whatsappNumbers") || "[]");
+                              saved.unshift(value);
+                              localStorage.setItem("whatsappNumbers", JSON.stringify(saved.slice(0, 5)));
+                              message.success("Número guardado");
+                            }
+                          }}
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: "15px",
+                            borderRadius: "8px"
+                          }}
+                        />
+                      </Form.Item>
+
+                      <Text type="secondary" style={{ fontSize: "13px", display: "block" }}>
+                        ✓ Soporta números españoles (+34) e internacionales
+                      </Text>
+                    </Space>
                   )}
                 </Card>
 
