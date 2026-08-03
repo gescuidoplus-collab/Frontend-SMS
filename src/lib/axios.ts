@@ -17,13 +17,20 @@ api.interceptors.request.use(
   }
 );
 
+let isLoggingOut = false;
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login?expired=true";
+    if (error.response?.status === 401 && typeof window !== "undefined" && !isLoggingOut) {
+      const isLoginPage = window.location.pathname === "/login" || window.location.pathname.startsWith("/login");
+
+      if (!isLoginPage) {
+        isLoggingOut = true;
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login?expired=true";
+      }
     }
     return Promise.reject(error);
   }
