@@ -211,7 +211,7 @@ const DashboardPage = () => {
     // Calcular cotizaciones del empleado desglosadas
     const contingenciasComunesCalc = valoresTabla.baseCotizacion * 0.047;
     const desempleoCalc = valoresTabla.baseCotizacion * 0.0155;
-    const formacionProfesionalCalc = valoresTabla.baseCotizacion * 0.0012;
+    const formacionProfesionalCalc = valoresTabla.baseCotizacion * 0.0015;
     const cotizacionesEmpleadosCalc = valoresTabla.baseCotizacion * 0.0637;
 
     setContingenciasComunes(contingenciasComunesCalc);
@@ -1123,7 +1123,7 @@ const DashboardPage = () => {
                   </Text>
                   <br />
                   <Text type="secondary">
-                    Formación profesional (0,12%):{" "}
+                    Formación profesional (0,15%):{" "}
                     {formacionProfesional.toFixed(2)}€
                   </Text>
                 </div>
