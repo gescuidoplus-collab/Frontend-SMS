@@ -37,6 +37,7 @@ import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cl
 import { mapEmpleadoToFiniquito, mapEmpleadorToFiniquito } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 import { obtenerToken } from "@/lib/session";
+import { API_URL } from "@/lib/config";
 
 const { Title, Text } = Typography;
 
@@ -347,7 +348,7 @@ export default function FiniquitoPage() {
       try {
         const token = obtenerToken();
         const res = await fetch(
-          "http://localhost:3001/api/v1/finiquito/texto-por-defecto",
+          `${API_URL}/finiquito/texto-por-defecto`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (!res.ok) return;
@@ -368,7 +369,7 @@ export default function FiniquitoPage() {
     try {
       const token = obtenerToken();
       const response = await fetch(
-        "http://localhost:3001/api/v1/finiquito/lista",
+        `${API_URL}/finiquito/lista`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -536,7 +537,7 @@ export default function FiniquitoPage() {
     try {
       const token = obtenerToken();
       const response = await fetch(
-        `http://localhost:3001/api/v1/finiquito/${record._id}/descargar`,
+        `${API_URL}/finiquito/${record._id}/descargar`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -593,7 +594,7 @@ export default function FiniquitoPage() {
         try {
           const token = obtenerToken();
           const res = await fetch(
-            `http://localhost:3001/api/v1/finiquito/${record._id}`,
+            `${API_URL}/finiquito/${record._id}`,
             { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
           );
           if (!res.ok) throw new Error(`${res.status}`);
@@ -761,7 +762,7 @@ export default function FiniquitoPage() {
       const token = obtenerToken();
 
       const response = await fetch(
-        "http://localhost:3001/api/v1/finiquito/crear",
+        `${API_URL}/finiquito/crear`,
         {
           method: "POST",
           headers: {

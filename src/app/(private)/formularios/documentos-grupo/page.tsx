@@ -30,6 +30,7 @@ import { fetchCloudnavisEmpleado } from "@/services/cloudnavisClient";
 import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 import { obtenerToken } from "@/lib/session";
+import { API_URL } from "@/lib/config";
 
 const { Title, Text } = Typography;
 
@@ -133,7 +134,7 @@ export default function DocumentosGrupoPage() {
     setDocumentosLoading(true);
     try {
       const token = obtenerToken();
-      const res = await fetch("http://localhost:3001/api/v1/documentos-grupo/lista", {
+      const res = await fetch(`${API_URL}/documentos-grupo/lista`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -205,7 +206,7 @@ export default function DocumentosGrupoPage() {
     try {
       const token = obtenerToken();
       const response = await fetch(
-        `http://localhost:3001/api/v1/documentos-grupo/${record._id}/descargar`,
+        `${API_URL}/documentos-grupo/${record._id}/descargar`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) {
@@ -255,7 +256,7 @@ export default function DocumentosGrupoPage() {
         try {
           const token = obtenerToken();
           const res = await fetch(
-            `http://localhost:3001/api/v1/documentos-grupo/${record._id}`,
+            `${API_URL}/documentos-grupo/${record._id}`,
             { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
           );
           if (!res.ok) throw new Error(`${res.status}`);
@@ -292,7 +293,7 @@ export default function DocumentosGrupoPage() {
 
       const token = obtenerToken();
       const response = await fetch(
-        "http://localhost:3001/api/v1/documentos-grupo/crear",
+        `${API_URL}/documentos-grupo/crear`,
         {
           method: "POST",
           headers: {
