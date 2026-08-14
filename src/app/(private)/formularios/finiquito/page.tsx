@@ -16,6 +16,7 @@ import {
   DatePicker,
   Switch,
   Select,
+  Alert,
   Divider,
   Descriptions,
   Table,
@@ -44,15 +45,17 @@ interface FormValues {
   nomempleada?: string;
   tipoDocumentoEmpleada?: "NIE" | "NIF";
   niempleada?: string;
+  textoIntro?: string;
+  // Ya no se piden en el formulario, pero pueden llegar prellenados desde CloudNavis
   correoempleada?: string;
   nomempleador?: string;
   correoempleador?: string;
   fechadesde?: Dayjs;
-  diasalario?: Dayjs;
   fechasalariofinalconanio?: Dayjs;
   salarioNeto?: number;
   tipoJornada?: "lv" | "finde";
-  diasLaborablesMes?: number;
+  enPruebas?: boolean;
+  diasVacacionesDisfrutadas?: number;
   aplicaPreaviso?: boolean;
   diasSinPreaviso?: number;
   aplicaIndemnizacion?: boolean;
@@ -61,12 +64,42 @@ interface FormValues {
 
 interface Calculado {
   diasTrabajados: number;
-  diasVacaciones: number;
+  diasPeriodo: number;
+  // Vacaciones: se computan solo dentro del año en curso
+  diasComputoVacaciones: number;
+  diasVacacionesGenerados: number;
+  diasVacacionesAPagar: number;
+  // Desglose de la indemnización
+  salarioBruto: number;
+  baseCotizacion: number;
+  baseReguladora: number;
+  diasIndemnizacion: number;
   importeSalario: number;
   importeVacaciones: number;
   importePreaviso: number;
   importeIndemnizacion: number;
   total: number;
+}
+
+interface FiniquitoRecord {
+  _id: string;
+  fecha?: string;
+  nomempleada?: string;
+  niempleada?: string;
+  // Nombres antiguos, presentes solo en registros creados antes de unificarlos
+  nombretrabajador?: string;
+  niftrabajador?: string;
+  nomempleador?: string;
+  total?: string | number;
+  vacacionesimporte?: string | number;
+  preaviso?: string;
+  indemnizacion?: string;
+  status?: string;
+  createdAt?: string;
+  correoempleado?: string;
+  correoempleador?: string;
+  signingLinks?: { role: string; link: string }[];
+  lastError?: { stage?: string; message?: string };
 }
 
 const formatearFecha = (
@@ -99,12 +132,33 @@ const determinarTramoFiniquito = (salarioNeto: number): number => {
   return salarioNeto; // Tramo 8: base = salario real
 };
 
-// Cuenta los sábados y domingos entre dos fechas, ambas inclusive
+// Conceptos de cotización a cargo del empleado. Se calculan por separado sobre
+// la base y se suman (4,70 + 1,55 + 0,15 = 6,40%).
+const CONTINGENCIAS_COMUNES = 0.047;
+const DESEMPLEO = 0.0155;
+const FORMACION_PROFESIONAL = 0.0015;
+
+/**
+ * Obtiene el salario bruto a partir del neto: se localiza el tramo con el neto,
+ * se calculan las tres cotizaciones del empleado sobre esa base y su suma se
+ * añade al neto.
+ */
+const calcularSalarioBruto = (salarioNeto: number): number => {
+  const baseProvisional = determinarTramoFiniquito(salarioNeto);
+  const cotizacionEmpleado =
+    baseProvisional * CONTINGENCIAS_COMUNES +
+    baseProvisional * DESEMPLEO +
+    baseProvisional * FORMACION_PROFESIONAL;
+  return salarioNeto + cotizacionEmpleado;
+};
+
+// Cuenta los sábados y domingos desde `inicio` hasta `fin`, sin incluir `fin`
+// (mismo criterio que el resto de conteos de días).
 const contarDiasFinde = (inicio: Dayjs, fin: Dayjs): number => {
   let dias = 0;
   let cursor = inicio.startOf("day");
   const limite = fin.startOf("day");
-  while (!cursor.isAfter(limite)) {
+  while (cursor.isBefore(limite)) {
     const diaSemana = cursor.day(); // 0 = domingo, 6 = sábado
     if (diaSemana === 0 || diaSemana === 6) dias += 1;
     cursor = cursor.add(1, "day");
@@ -112,10 +166,40 @@ const contarDiasFinde = (inicio: Dayjs, fin: Dayjs): number => {
   return dias;
 };
 
+/**
+ * El último período salarial es el del mes en curso: los meses anteriores ya
+ * se pagaron en su nómina. Arranca el día 1 del mes de la baja, salvo que el
+ * contrato empezara ese mismo mes, en cuyo caso arranca en la fecha de alta.
+ */
+const calcularInicioPeriodoSalarial = (
+  fechadesde?: Dayjs,
+  fechasalariofinalconanio?: Dayjs
+): Dayjs | undefined => {
+  if (!fechasalariofinalconanio) return undefined;
+  const primeroDelMes = fechasalariofinalconanio.startOf("month");
+  if (fechadesde && fechadesde.isAfter(primeroDelMes)) return fechadesde;
+  return primeroDelMes;
+};
+
+/**
+ * Las vacaciones no se acumulan de un año para otro: se computan siempre
+ * dentro del año en curso. Si el contrato viene de años anteriores se arranca
+ * el 1 de enero; si empezó este año, desde la fecha de alta.
+ */
+const calcularInicioComputoVacaciones = (
+  fechadesde?: Dayjs,
+  fechasalariofinalconanio?: Dayjs
+): Dayjs | undefined => {
+  if (!fechasalariofinalconanio) return undefined;
+  const primeroDeEnero = fechasalariofinalconanio.startOf("year");
+  if (fechadesde && fechadesde.isAfter(primeroDeEnero)) return fechadesde;
+  return primeroDeEnero;
+};
+
 // Antigüedad < 1 año → 7 días de preaviso; ≥ 1 año → 20 días (RD-ley 16/2022)
 const sugerirDiasPreaviso = (fechadesde?: Dayjs, fechasalariofinalconanio?: Dayjs): number => {
   if (!fechadesde || !fechasalariofinalconanio) return 7;
-  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day") + 1;
+  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day");
   return diasTrabajados >= 365 ? 20 : 7;
 };
 
@@ -123,17 +207,17 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
   const {
     fechadesde,
     fechasalariofinalconanio,
-    diasalario,
     salarioNeto,
     tipoJornada,
-    diasLaborablesMes,
+    enPruebas,
+    diasVacacionesDisfrutadas,
     aplicaPreaviso,
     diasSinPreaviso,
     aplicaIndemnizacion,
     indemnizacionDiasPorAnio,
   } = values;
 
-  if (!fechadesde || !fechasalariofinalconanio || !diasalario || !salarioNeto || salarioNeto <= 0) {
+  if (!fechadesde || !fechasalariofinalconanio || !salarioNeto || salarioNeto <= 0) {
     return null;
   }
 
@@ -142,37 +226,76 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
     return null;
   }
 
-  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day") + 1;
-  if (diasTrabajados <= 0) return null;
+  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day");
+  if (diasTrabajados < 0) return null;
 
   const salarioDiarioNeto = salarioNeto / 30;
 
-  // 1. Vacaciones proporcionales
-  const diasVacaciones = (diasTrabajados * 30) / 365;
-  const importeVacaciones = diasVacaciones * salarioDiarioNeto;
+  // 1. Salario del último período (solo los días del mes en curso). En jornada
+  // de fin de semana se cuentan únicamente los sábados y domingos del período.
+  const inicioPeriodo = calcularInicioPeriodoSalarial(fechadesde, fechasalariofinalconanio)!;
+  const diasPeriodo =
+    tipoJornada === "finde"
+      ? contarDiasFinde(inicioPeriodo, fechasalariofinalconanio)
+      : fechasalariofinalconanio.diff(inicioPeriodo, "day");
+  const importeSalario = Math.max(0, diasPeriodo * salarioDiarioNeto);
 
-  // 2. Salario del último período
-  let importeSalario: number;
-  if (tipoJornada === "finde") {
-    if (!diasLaborablesMes || diasLaborablesMes <= 0) return null;
-    const diasPeriodoFinde = contarDiasFinde(diasalario, fechasalariofinalconanio);
-    importeSalario = Math.max(0, diasPeriodoFinde * (salarioNeto / diasLaborablesMes));
-  } else {
-    const diasPeriodo = fechasalariofinalconanio.diff(diasalario, "day") + 1;
-    importeSalario = Math.max(0, diasPeriodo * salarioDiarioNeto);
+  // Durante el período de prueba solo se abonan los días trabajados: no hay
+  // vacaciones, ni preaviso, ni indemnización.
+  if (enPruebas) {
+    return {
+      diasTrabajados,
+      diasPeriodo,
+      diasComputoVacaciones: 0,
+      diasVacacionesGenerados: 0,
+      diasVacacionesAPagar: 0,
+      salarioBruto: 0,
+      baseCotizacion: 0,
+      baseReguladora: 0,
+      diasIndemnizacion: 0,
+      importeSalario,
+      importeVacaciones: 0,
+      importePreaviso: 0,
+      importeIndemnizacion: 0,
+      total: importeSalario,
+    };
   }
 
-  // 3. Indemnización (solo si aplica)
+  // 2. Vacaciones: solo las generadas dentro del año en curso, menos las que
+  // ya se hayan disfrutado. En jornada de fin de semana se computan únicamente
+  // los sábados y domingos, igual que en el salario.
+  const inicioVacaciones = calcularInicioComputoVacaciones(
+    fechadesde,
+    fechasalariofinalconanio
+  )!;
+  const diasComputoVacaciones =
+    tipoJornada === "finde"
+      ? contarDiasFinde(inicioVacaciones, fechasalariofinalconanio)
+      : fechasalariofinalconanio.diff(inicioVacaciones, "day");
+  const diasVacacionesGenerados = (diasComputoVacaciones * 30) / 365;
+  const diasVacacionesAPagar = Math.max(
+    0,
+    diasVacacionesGenerados - (diasVacacionesDisfrutadas || 0)
+  );
+  const importeVacaciones = diasVacacionesAPagar * salarioDiarioNeto;
+
+  // 3. Indemnización (solo si aplica). El tramo se busca con el salario BRUTO,
+  // que es como está indexada la tabla oficial, no con el neto.
   let importeIndemnizacion = 0;
+  let salarioBruto = 0;
+  let baseCotizacion = 0;
+  let baseReguladora = 0;
+  let diasIndemnizacion = 0;
   if (aplicaIndemnizacion) {
-    const anos = diasTrabajados / 365;
-    const baseCotizacion = determinarTramoFiniquito(salarioNeto);
-    const salarioDiarioBase = baseCotizacion / 30;
+    salarioBruto = calcularSalarioBruto(salarioNeto);
+    baseCotizacion = determinarTramoFiniquito(salarioBruto);
+    baseReguladora = baseCotizacion / 30;
     const diasPorAnio = indemnizacionDiasPorAnio || 12;
-    importeIndemnizacion = salarioDiarioBase * diasPorAnio * anos;
+    diasIndemnizacion = (diasTrabajados * diasPorAnio) / 365;
+    importeIndemnizacion = baseReguladora * diasIndemnizacion;
   }
 
-  // 4. Preaviso (solo si aplica)
+  // 4. Preaviso (solo si aplica): lo que cuesta el día por los días no avisados
   let importePreaviso = 0;
   if (aplicaPreaviso && diasSinPreaviso && diasSinPreaviso > 0) {
     importePreaviso = salarioDiarioNeto * diasSinPreaviso;
@@ -183,7 +306,14 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
 
   return {
     diasTrabajados,
-    diasVacaciones,
+    diasPeriodo,
+    diasComputoVacaciones,
+    diasVacacionesGenerados,
+    diasVacacionesAPagar,
+    salarioBruto,
+    baseCotizacion,
+    baseReguladora,
+    diasIndemnizacion,
     importeSalario,
     importeVacaciones,
     importePreaviso,
@@ -197,13 +327,39 @@ export default function FiniquitoPage() {
   const [loading, setLoading] = useState(false);
   const [aplicaPreaviso, setAplicaPreaviso] = useState(false);
   const [aplicaIndemnizacion, setAplicaIndemnizacion] = useState(false);
+  const [enPruebas, setEnPruebas] = useState(false);
   const [preavisoTouched, setPreavisoTouched] = useState(false);
-  const [tipoJornada, setTipoJornada] = useState<"lv" | "finde">("lv");
   const [calculado, setCalculado] = useState<Calculado | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [finiquitos, setFiniquitos] = useState<any[]>([]);
+  const [finiquitos, setFiniquitos] = useState<FiniquitoRecord[]>([]);
   const [finiquitosLoading, setFiniquitosLoading] = useState(false);
+  const [textoPorDefecto, setTextoPorDefecto] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    cargarFiniquitos();
+  }, []);
+
+  // El texto declarativo vive en el backend para no duplicarlo aquí
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(
+          "http://localhost:3001/api/v1/finiquito/texto-por-defecto",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const intro = data?.data?.texto || "";
+        setTextoPorDefecto(intro);
+        if (!form.getFieldValue("textoIntro")) form.setFieldValue("textoIntro", intro);
+      } catch {
+        // Si no llega, el backend usará su texto por defecto igualmente
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const cargarFiniquitos = async () => {
@@ -244,12 +400,6 @@ export default function FiniquitoPage() {
     if (fechadesde) {
       const parsed = dayjs(fechadesde, "YYYY-MM-DD", true);
       if (parsed.isValid()) prefill.fechadesde = parsed;
-    }
-
-    const diasalario = params.get("diasalario");
-    if (diasalario) {
-      const parsed = dayjs(diasalario, "YYYY-MM-DD", true);
-      if (parsed.isValid()) prefill.diasalario = parsed;
     }
 
     const fechasalariofinalconanio = params.get("fechasalariofinalconanio");
@@ -364,12 +514,9 @@ export default function FiniquitoPage() {
     ) {
       const sugerido = sugerirDiasPreaviso(allValues.fechadesde, allValues.fechasalariofinalconanio);
       form.setFieldValue("diasSinPreaviso", sugerido);
-      valores = { ...allValues, diasSinPreaviso: sugerido };
+      valores = { ...valores, diasSinPreaviso: sugerido };
     }
 
-    if ("tipoJornada" in changed) {
-      setTipoJornada(changed.tipoJornada || "lv");
-    }
 
     const result = calcularFiniquito({
       ...valores,
@@ -381,6 +528,180 @@ export default function FiniquitoPage() {
 
   const fmt = (n: number) =>
     n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const descargarPdf = async (record: FiniquitoRecord) => {
+    const key = `descarga-${record._id}`;
+    message.loading({ content: "Generando PDF...", key });
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:3001/api/v1/finiquito/${record._id}/descargar`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!response.ok) {
+        const detalle = await response.text();
+        throw new Error(`${response.status} — ${detalle.slice(0, 200)}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      // El enlace debe estar en el DOM para que el click dispare la descarga
+      // en todos los navegadores, y la URL no puede revocarse antes de tiempo.
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `finiquito-${
+        record.nomempleada || record.nombretrabajador || record._id
+      }.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+
+      message.success({ content: "PDF descargado", key });
+    } catch (err) {
+      console.error("Error descargando PDF:", err);
+      message.error({
+        content: `No se pudo descargar el PDF: ${(err as Error).message}`,
+        key,
+        duration: 6,
+      });
+    }
+  };
+
+  const eliminarFiniquito = (record: FiniquitoRecord) => {
+    Modal.confirm({
+      title: "Eliminar finiquito",
+      icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+      content: (
+        <div>
+          <p>
+            Se eliminará el finiquito de{" "}
+            <strong>{record.nomempleada || record.nombretrabajador || "esta empleada"}</strong>.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Los enlaces de firma dejarán de funcionar y no se podrá recuperar.
+          </p>
+        </div>
+      ),
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(
+            `http://localhost:3001/api/v1/finiquito/${record._id}`,
+            { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (!res.ok) throw new Error(`${res.status}`);
+          message.success("Finiquito eliminado");
+          cargarFiniquitos();
+        } catch (err) {
+          console.error("Error eliminando finiquito:", err);
+          message.error("No se pudo eliminar el finiquito");
+        }
+      },
+    });
+  };
+
+  const mostrarDetalle = (record: FiniquitoRecord) => {
+    Modal.info({
+      title: `Finiquito - ${record.nomempleada || record.nombretrabajador || ""}`,
+      width: 600,
+      okText: "Cerrar",
+      content: (
+        <Descriptions
+          column={1}
+          size="small"
+          items={[
+            {
+              key: "estado",
+              label: "Estado",
+              children: (
+                <Tag color={record.status === "firmado" ? "success" : "processing"}>
+                  {record.status}
+                </Tag>
+              ),
+            },
+            {
+              key: "empleado",
+              label: "Empleado",
+              children: `${record.nomempleada || record.nombretrabajador || "-"} (${
+                record.niempleada || record.niftrabajador || "-"
+              })`,
+            },
+            { key: "empleador", label: "Empleador", children: record.nomempleador || "-" },
+            {
+              key: "vacaciones",
+              label: "Vacaciones",
+              children: `${record.vacacionesimporte ?? "-"}€`,
+            },
+            { key: "preaviso", label: "Preaviso", children: record.preaviso || "-" },
+            {
+              key: "indemnizacion",
+              label: "Indemnización",
+              children: record.indemnizacion || "-",
+            },
+            { key: "total", label: "Total", children: `${record.total ?? "-"}€` },
+            ...(record.lastError?.message
+              ? [
+                  {
+                    key: "error",
+                    label: "Último error",
+                    children: `${record.lastError.stage || ""}: ${record.lastError.message}`,
+                  },
+                ]
+              : []),
+          ]}
+        />
+      ),
+    });
+  };
+
+  const mostrarEnlacesFirma = (links: { role: string; link: string }[]) => {
+    Modal.info({
+      title: "Enlaces de firma",
+      width: 640,
+      okText: "Cerrar",
+      content: (
+        <div>
+          <p style={{ marginBottom: 12 }}>
+            Envía cada enlace a la persona correspondiente. Con el enlace puede ver el
+            documento y firmarlo, sin necesidad de correo ni de crearse una cuenta.
+          </p>
+          {links.map((l) => (
+            <div key={l.role} style={{ marginBottom: 16 }}>
+              <Text strong>{l.role}</Text>
+              <Input.TextArea
+                value={l.link}
+                readOnly
+                autoSize
+                onFocus={(e) => e.target.select()}
+                style={{ marginTop: 4, fontSize: 12 }}
+              />
+              <Space style={{ marginTop: 4 }}>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(l.link);
+                    message.success(`Enlace de ${l.role} copiado`);
+                  }}
+                >
+                  Copiar enlace
+                </Button>
+                <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                  Abrir
+                </Button>
+              </Space>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
 
   const onFinish = async (values: FormValues) => {
     if (!calculado) {
@@ -398,26 +719,40 @@ export default function FiniquitoPage() {
         nomempleada: values.nomempleada || "",
         tipoDocumentoEmpleada: values.tipoDocumentoEmpleada || "NIE",
         niempleada: values.niempleada || "",
+        textoIntro: values.textoIntro || "",
         correoempleada: values.correoempleada || "",
         nomempleador: values.nomempleador || "",
         nifempleador: "", // Agregar estos del formulario si están disponibles
         correoempleador: values.correoempleador || "",
         fechadesde: formatearFecha(values.fechadesde, "completaDel"),
-        diasalario: formatearFecha(values.diasalario, "mesYDia"),
+        // El período salarial se deduce de las fechas, no se pide en el formulario
+        diasalario: formatearFecha(
+          calcularInicioPeriodoSalarial(values.fechadesde, values.fechasalariofinalconanio),
+          "mesYDia"
+        ),
         fechasalariofinalconanio: formatearFecha(values.fechasalariofinalconanio, "completa"),
         salarioNeto: values.salarioNeto || 0,
         tipoJornada: values.tipoJornada || "lv",
-        diasLaborablesMes: values.tipoJornada === "finde" ? values.diasLaborablesMes || 0 : undefined,
-        aplicaPreaviso,
-        diasSinPreaviso: aplicaPreaviso ? values.diasSinPreaviso || 0 : undefined,
-        aplicaIndemnizacion,
-        indemnizacionDiasPorAnio: aplicaIndemnizacion ? values.indemnizacionDiasPorAnio || 12 : undefined,
+        // En período de prueba solo se abonan los días trabajados
+        enPruebas,
+        aplicaPreaviso: enPruebas ? false : aplicaPreaviso,
+        diasSinPreaviso: !enPruebas && aplicaPreaviso ? values.diasSinPreaviso || 0 : undefined,
+        aplicaIndemnizacion: enPruebas ? false : aplicaIndemnizacion,
+        indemnizacionDiasPorAnio:
+          !enPruebas && aplicaIndemnizacion ? values.indemnizacionDiasPorAnio || 12 : undefined,
         // Finiquito: salario + vacaciones + preaviso + indemnización
         salarioLiquidacionImporte: calculado.importeSalario.toFixed(2),
-        vacacionesdias: calculado.diasVacaciones.toFixed(3),
+        diasVacacionesDisfrutadas: enPruebas ? 0 : values.diasVacacionesDisfrutadas || 0,
+        // Se envía para poder mostrarla en la línea de indemnización del PDF
+        baseReguladora: calculado.baseReguladora.toFixed(2),
+        vacacionesdias: calculado.diasVacacionesAPagar.toFixed(2),
         vacacionesimporte: calculado.importeVacaciones.toFixed(2),
-        preaviso: aplicaPreaviso ? calculado.importePreaviso.toFixed(2) : "no procede",
-        indemnizacion: aplicaIndemnizacion ? calculado.importeIndemnizacion.toFixed(2) : "no procede",
+        preaviso:
+          !enPruebas && aplicaPreaviso ? calculado.importePreaviso.toFixed(2) : "no procede",
+        indemnizacion:
+          !enPruebas && aplicaIndemnizacion
+            ? calculado.importeIndemnizacion.toFixed(2)
+            : "no procede",
         total: calculado.total.toFixed(2),
       };
 
@@ -439,32 +774,81 @@ export default function FiniquitoPage() {
       message.destroy("sending");
 
       if (response.ok) {
-        message.success("✓ Finiquito enviado correctamente");
+        const resultado = await response.json();
+        const links: { role: string; link: string }[] = resultado?.data?.signingLinks || [];
+        const finiquitoId = resultado?.data?.finiquitoId;
+
+        message.success("✓ Finiquito generado correctamente");
+        // Refrescamos ya, para que aparezca en la tabla aunque se cierre el
+        // modal sin pulsar "Cerrar".
+        cargarFiniquitos();
         setTimeout(() => {
           Modal.success({
-            title: "¡Finiquito Enviado Correctamente!",
+            title: "¡Finiquito Generado Correctamente!",
             icon: <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 48 }} />,
+            width: 640,
             content: (
               <div>
-                <p style={{ marginBottom: 12 }}>
-                  ✓ La invitación a la firma ha sido enviada a los correos correspondientes.
-                </p>
-                <p style={{ marginBottom: 12 }}>
-                  ✓ Puedes ver el documento en <strong>SignNow</strong>
-                </p>
-                <p>
-                  ✓ Una vez se firme, se guardará automáticamente en <strong>Google Drive</strong>
-                </p>
+                {links.length > 0 ? (
+                  <>
+                    <p style={{ marginBottom: 12 }}>
+                      Comparte estos enlaces para que cada parte firme. No hace falta
+                      correo: con el enlace se puede ver el documento y firmarlo.
+                    </p>
+                    {links.map((l) => (
+                      <div key={l.role} style={{ marginBottom: 12 }}>
+                        <Text strong>{l.role}</Text>
+                        <Input.TextArea
+                          value={l.link}
+                          readOnly
+                          autoSize
+                          onFocus={(e) => e.target.select()}
+                          style={{ marginTop: 4, fontSize: 12 }}
+                        />
+                        <Space style={{ marginTop: 4 }}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            onClick={() => {
+                              navigator.clipboard.writeText(l.link);
+                              message.success(`Enlace de ${l.role} copiado`);
+                            }}
+                          >
+                            Copiar enlace
+                          </Button>
+                          <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                            Abrir
+                          </Button>
+                        </Space>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p style={{ marginBottom: 12 }}>
+                    ✓ El documento se generó con todos los datos y ya puedes descargarlo
+                    desde el historial de finiquitos.
+                  </p>
+                )}
+                {finiquitoId && (
+                  <p style={{ marginTop: 12, marginBottom: 0 }}>
+                    Si cierras esta ventana, puedes volver a ver los enlaces con el botón{" "}
+                    <strong>Enlaces</strong> del <strong>Historial de Finiquitos</strong>.
+                  </p>
+                )}
               </div>
             ),
             okText: "Cerrar",
             onOk: () => {
+              // El texto del documento se conserva entre finiquitos: si se
+              // ajustó, no tiene sentido volver a escribirlo cada vez.
+              const textoActual = form.getFieldValue("textoIntro");
               form.resetFields();
+              form.setFieldValue("textoIntro", textoActual || textoPorDefecto);
               setCalculado(null);
               setAplicaPreaviso(false);
               setAplicaIndemnizacion(false);
+              setEnPruebas(false);
               cargarFiniquitos(); // Recargar lista
-              router.push("/formularios");
             },
           });
         }, 500);
@@ -611,18 +995,6 @@ export default function FiniquitoPage() {
                     <Input placeholder="Ej. X1234567Z" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Correo Electrónico"
-                    name="correoempleada"
-                    rules={[
-                      { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" },
-                    ]}
-                  >
-                    <Input placeholder="ejemplo@email.com" type="email" />
-                  </Form.Item>
-                </Col>
               </Row>
             </Card>
 
@@ -636,18 +1008,6 @@ export default function FiniquitoPage() {
                     rules={[{ required: true, message: "El nombre es requerido" }]}
                   >
                     <Input placeholder="Ej. Juan García López" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Correo Electrónico"
-                    name="correoempleador"
-                    rules={[
-                      { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" },
-                    ]}
-                  >
-                    <Input placeholder="ejemplo@empresa.com" type="email" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -676,15 +1036,6 @@ export default function FiniquitoPage() {
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Inicio del Último Período Salarial"
-                    name="diasalario"
-                    rules={[{ required: true, message: "El día de inicio de salario es requerido" }]}
-                  >
-                    <DatePicker style={{ width: "100%" }} placeholder="Ej. 1 de Junio" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
                     label="Salario Neto Mensual (€)"
                     name="salarioNeto"
                     rules={[{ required: true, message: "El salario neto es requerido" }]}
@@ -703,40 +1054,86 @@ export default function FiniquitoPage() {
                   <Form.Item
                     label="Tipo de Jornada"
                     name="tipoJornada"
+                    tooltip="En fines de semana solo se pagan los sábados y domingos del período"
                     rules={[{ required: true, message: "Requerido" }]}
                   >
-                    <Select onChange={(value) => setTipoJornada(value)}>
+                    <Select>
                       <Select.Option value="lv">Lunes a viernes</Select.Option>
                       <Select.Option value="finde">Fines de semana</Select.Option>
                     </Select>
                   </Form.Item>
                 </Col>
-                {tipoJornada === "finde" && (
-                  <Col xs={24} sm={12}>
-                    <Form.Item
-                      label="Días Laborables Reales al Mes"
-                      name="diasLaborablesMes"
-                      rules={[{ required: true, message: "Indica los días laborables al mes" }]}
-                      tooltip="Número de días que realmente se trabaja al mes (ej. 8 si son solo fines de semana)"
-                    >
-                      <InputNumber
-                        min={1}
-                        max={31}
-                        precision={0}
-                        style={{ width: "100%" }}
-                        addonAfter="días/mes"
-                      />
-                    </Form.Item>
-                  </Col>
-                )}
               </Row>
             </Card>
 
             {/* Conceptos especiales */}
             <Card title="Conceptos Especiales" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
+                <Col xs={24}>
+                  <Form.Item
+                    label="¿Estaba en período de prueba?"
+                    name="enPruebas"
+                    valuePropName="checked"
+                    tooltip="En período de prueba solo se abonan los días trabajados: no hay vacaciones, ni preaviso, ni indemnización."
+                  >
+                    <Switch
+                      checked={enPruebas}
+                      onChange={(checked) => {
+                        setEnPruebas(checked);
+                        if (checked) {
+                          setAplicaPreaviso(false);
+                          setAplicaIndemnizacion(false);
+                          form.setFieldsValue({
+                            aplicaPreaviso: false,
+                            aplicaIndemnizacion: false,
+                          });
+                        }
+                        setCalculado(
+                          calcularFiniquito({
+                            ...form.getFieldsValue(),
+                            enPruebas: checked,
+                            aplicaPreaviso: checked ? false : aplicaPreaviso,
+                            aplicaIndemnizacion: checked ? false : aplicaIndemnizacion,
+                          })
+                        );
+                      }}
+                    />
+                  </Form.Item>
+                  {enPruebas && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      message="Período de prueba: solo se pagan los días trabajados."
+                      description="No se calculan vacaciones, ni preaviso, ni indemnización."
+                    />
+                  )}
+                </Col>
+                {!enPruebas && (
+                <>
                 <Col xs={24} sm={12}>
-                  <Form.Item label="¿Aplica falta de preaviso?" name="aplicaPreaviso" valuePropName="checked">
+                  <Form.Item
+                    label="Días de vacaciones ya disfrutadas"
+                    name="diasVacacionesDisfrutadas"
+                    initialValue={0}
+                    tooltip="Se restan a las vacaciones generadas en el año en curso. Déjalo en 0 si no disfrutó ninguna."
+                  >
+                    <InputNumber
+                      min={0}
+                      step={0.5}
+                      precision={2}
+                      style={{ width: "100%" }}
+                      addonAfter="días"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Form.Item
+                    label="¿Se despidió SIN preaviso?"
+                    name="aplicaPreaviso"
+                    valuePropName="checked"
+                    tooltip="Si se avisó con la antelación legal, no hay que pagar nada por este concepto. Si no se avisó, se compensan los días de preaviso que faltaron."
+                  >
                     <Switch
                       onChange={(checked) => {
                         setAplicaPreaviso(checked);
@@ -758,12 +1155,12 @@ export default function FiniquitoPage() {
                   </Form.Item>
                 </Col>
                 {aplicaPreaviso && (
-                  <Col xs={24} sm={12}>
+                  <Col xs={24} sm={6}>
                     <Form.Item
-                      label="Días sin preaviso"
+                      label="Días de preaviso a compensar"
                       name="diasSinPreaviso"
                       rules={[{ required: true, message: "Indica los días" }]}
-                      tooltip="Se autoselecciona según la antigüedad (<1 año = 7 días, ≥1 año = 20 días); puedes cambiarlo manualmente"
+                      tooltip="Se autoselecciona según la antigüedad (menos de 1 año = 7 días, 1 año o más = 20 días); puedes cambiarlo manualmente"
                     >
                       <Select onChange={() => setPreavisoTouched(true)}>
                         <Select.Option value={7}>7 días</Select.Option>
@@ -772,7 +1169,14 @@ export default function FiniquitoPage() {
                     </Form.Item>
                   </Col>
                 )}
-                <Col xs={24} sm={12}>
+                </>
+                )}
+              </Row>
+
+              {/* La indemnización va en su propia fila, debajo de las vacaciones */}
+              {!enPruebas && (
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={6}>
                   <Form.Item label="¿Aplica indemnización por despido?" name="aplicaIndemnizacion" valuePropName="checked">
                     <Switch
                       onChange={(checked) => {
@@ -789,7 +1193,7 @@ export default function FiniquitoPage() {
                   </Form.Item>
                 </Col>
                 {aplicaIndemnizacion && (
-                  <Col xs={24} sm={12}>
+                  <Col xs={24} sm={6}>
                     <Form.Item
                       label="Días de Indemnización por Año"
                       name="indemnizacionDiasPorAnio"
@@ -817,6 +1221,36 @@ export default function FiniquitoPage() {
                   </Col>
                 )}
               </Row>
+              )}
+            </Card>
+
+            {/* Texto del documento */}
+            <Card title="Texto del Documento" style={{ marginBottom: "24px" }}>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="Este es el texto que aparece en el documento. Puedes editarlo."
+                description={
+                  <span>
+                    Usa <code>{"{{empleada}}"}</code>, <code>{"{{empleadora}}"}</code> y{" "}
+                    <code>{"{{fechaEfectos}}"}</code> para insertar los datos automáticamente, y{" "}
+                    <code>**texto**</code> para poner algo en negrita. Deja una línea en blanco
+                    para separar párrafos.
+                  </span>
+                }
+              />
+              <Form.Item name="textoIntro" style={{ marginBottom: 16 }}>
+                <Input.TextArea autoSize={{ minRows: 8 }} style={{ fontSize: 13 }} />
+              </Form.Item>
+
+              <Button
+                size="small"
+                onClick={() => form.setFieldValue("textoIntro", textoPorDefecto)}
+                disabled={!textoPorDefecto}
+              >
+                Restaurar texto original
+              </Button>
             </Card>
 
             {/* Resultado calculado */}
@@ -833,24 +1267,63 @@ export default function FiniquitoPage() {
               {calculado ? (
                 <>
                   <Descriptions column={1} bordered size="small">
-                    <Descriptions.Item label="Salario del último período">
+                    <Descriptions.Item
+                      label={`Salario del último período (${calculado.diasPeriodo} ${
+                        calculado.diasPeriodo === 1 ? "día" : "días"
+                      })`}
+                    >
                       <strong>{fmt(calculado.importeSalario)} €</strong>
                     </Descriptions.Item>
                     <Descriptions.Item
-                      label={`Vacaciones proporcionales (${calculado.diasVacaciones.toFixed(3)} días)`}
+                      label={
+                        enPruebas
+                          ? "Vacaciones no disfrutadas"
+                          : `Vacaciones no disfrutadas (${calculado.diasVacacionesAPagar.toFixed(
+                              2
+                            )} días a pagar)`
+                      }
                     >
-                      <strong>{fmt(calculado.importeVacaciones)} €</strong>
+                      {enPruebas ? (
+                        <Text type="secondary">no procede (período de prueba)</Text>
+                      ) : (
+                        <Space direction="vertical" size={0}>
+                          <strong>{fmt(calculado.importeVacaciones)} €</strong>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {calculado.diasVacacionesGenerados.toFixed(2)} generados en el año
+                            {" − "}
+                            {(
+                              calculado.diasVacacionesGenerados - calculado.diasVacacionesAPagar
+                            ).toFixed(2)}{" "}
+                            disfrutados · {calculado.diasComputoVacaciones} días computados
+                          </Text>
+                        </Space>
+                      )}
                     </Descriptions.Item>
                     <Descriptions.Item label="Compensación por falta de preaviso">
-                      {aplicaPreaviso ? (
+                      {enPruebas ? (
+                        <Text type="secondary">no procede (período de prueba)</Text>
+                      ) : aplicaPreaviso ? (
                         <strong>{fmt(calculado.importePreaviso)} €</strong>
                       ) : (
                         <Text type="secondary">no procede</Text>
                       )}
                     </Descriptions.Item>
                     <Descriptions.Item label="Indemnización por extinción">
-                      {aplicaIndemnizacion ? (
-                        <strong>{fmt(calculado.importeIndemnizacion)} €</strong>
+                      {enPruebas ? (
+                        <Text type="secondary">no procede (período de prueba)</Text>
+                      ) : aplicaIndemnizacion ? (
+                        <Space direction="vertical" size={0}>
+                          <strong>{fmt(calculado.importeIndemnizacion)} €</strong>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Bruto {fmt(calculado.salarioBruto)} € → base{" "}
+                            {fmt(calculado.baseCotizacion)} € → base reguladora{" "}
+                            {fmt(calculado.baseReguladora)} €/día
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {calculado.diasTrabajados} días de alta ={" "}
+                            {calculado.diasIndemnizacion.toFixed(2)} días de indemnización
+                          </Text>
+                        </Space>
                       ) : (
                         <Text type="secondary">no procede</Text>
                       )}
@@ -909,6 +1382,7 @@ export default function FiniquitoPage() {
                     setCalculado(null);
                     setAplicaPreaviso(false);
                     setAplicaIndemnizacion(false);
+                    setEnPruebas(false);
                   }}
                 >
                   Limpiar
@@ -941,13 +1415,13 @@ export default function FiniquitoPage() {
                     },
                     {
                       title: "Empleado",
-                      dataIndex: "nombretrabajador",
+                      dataIndex: "nomempleada",
                       key: "empleado",
                       render: (text, record) => (
                         <Space direction="vertical" size={0}>
-                          <Text strong>{text || "-"}</Text>
+                          <Text strong>{text || record.nombretrabajador || "-"}</Text>
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            {record.niftrabajador}
+                            {record.niempleada || record.niftrabajador}
                           </Text>
                         </Space>
                       ),
@@ -975,7 +1449,7 @@ export default function FiniquitoPage() {
                       dataIndex: "status",
                       key: "status",
                       render: (status) => {
-                        const statusMap: Record<string, any> = {
+                        const statusMap: Record<string, React.ReactNode> = {
                           pendiente: (
                             <Tag color="default">Pendiente</Tag>
                           ),
@@ -1029,62 +1503,25 @@ export default function FiniquitoPage() {
                           <Button
                             type="link"
                             size="small"
-                            onClick={() => {
-                              Modal.info({
-                                title: `Finiquito - ${record.nombretrabajador}`,
-                                width: 600,
-                                content: (
-                                  <Space direction="vertical" style={{ width: "100%" }}>
-                                    <Descriptions column={1} size="small">
-                                      <Descriptions.Item label="Estado">
-                                        <Tag color={record.status === "firmado" ? "success" : "processing"}>
-                                          {record.status}
-                                        </Tag>
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Empleado">
-                                        {record.nombretrabajador} ({record.niftrabajador})
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Empleador">
-                                        {record.nomempleador}
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Vacaciones">
-                                        {record.vacacionesimporte}€
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Preaviso">
-                                        {record.preaviso}
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Indemnización">
-                                        {record.indemnizacion}
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Total">
-                                        <Text strong>{record.total}€</Text>
-                                      </Descriptions.Item>
-                                    </Descriptions>
-
-                                    {record.lastError && (
-                                      <>
-                                        <Divider />
-                                        <Text type="danger" strong>
-                                          Último Error:
-                                        </Text>
-                                        <Card
-                                          size="small"
-                                          style={{ background: "#fff1f0", borderColor: "#ffccc7" }}
-                                        >
-                                          <Text type="danger">
-                                            <strong>Etapa:</strong> {record.lastError.stage}
-                                            <br />
-                                            <strong>Mensaje:</strong> {record.lastError.message}
-                                          </Text>
-                                        </Card>
-                                      </>
-                                    )}
-                                  </Space>
-                                ),
-                              });
-                            }}
+                            onClick={() => mostrarDetalle(record)}
                           >
                             Ver
+                          </Button>
+                          {(record.signingLinks || []).length > 0 && (
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => mostrarEnlacesFirma(record.signingLinks || [])}
+                            >
+                              Enlaces
+                            </Button>
+                          )}
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => descargarPdf(record)}
+                          >
+                            Descargar PDF
                           </Button>
                           {record.status === "error" && (
                             <Button
@@ -1105,13 +1542,21 @@ export default function FiniquitoPage() {
                               Reintentar
                             </Button>
                           )}
+                          <Button
+                            type="link"
+                            size="small"
+                            danger
+                            onClick={() => eliminarFiniquito(record)}
+                          >
+                            Eliminar
+                          </Button>
                         </Space>
                       ),
-                      width: 120,
+                      width: 300,
                     },
                   ]}
                   size="small"
-                  scroll={{ x: 1000 }}
+                  scroll={{ x: 1100 }}
                 />
               ) : (
                 <Empty
