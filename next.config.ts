@@ -27,6 +27,8 @@ const securityHeaders = [
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: fonts.gstatic.com",
       "connect-src 'self' http: https: ws: wss:",
+      // El PDF a firmar se descarga por fetch y se muestra como blob: en un iframe
+      "frame-src 'self' blob:",
       "frame-ancestors 'self'",
       "object-src 'none'",
       "base-uri 'self'",

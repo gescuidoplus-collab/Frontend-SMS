@@ -5,6 +5,7 @@ import {
   Form,
   Input,
   InputNumber,
+  AutoComplete,
   Select,
   Button,
   Row,
@@ -43,7 +44,6 @@ interface FormValues {
   nombretrabajador?: string;
   tipoDocumentoTrabajador?: "NIE" | "NIF";
   niftrabajador?: string;
-  correotrabajador?: string;
   numafiliaciontrabajador?: string;
   nivelformativotrabajador?: string;
   nacionalidadtrabajador?: string;
@@ -57,6 +57,21 @@ interface FormValues {
   montobruto?: number;
   lugarfirma?: string;
   fechanactrabajador?: Dayjs;
+}
+
+interface ContratoRecord {
+  _id: string;
+  fechacontrato?: string;
+  nombretrabajador?: string;
+  niftrabajador?: string;
+  nomempleador?: string;
+  montobruto?: string | number;
+  status?: string;
+  createdAt?: string;
+  correoempleado?: string;
+  correoempleador?: string;
+  signingLinks?: { role: string; link: string }[];
+  lastError?: { stage?: string; message?: string };
 }
 
 const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
@@ -129,64 +144,139 @@ const NACIONALIDADES = [
   "Zimbabuense", "Otra",
 ];
 
-// Lista de referencia de municipios de Vizcaya/Bizkaia — ampliar/corregir según necesidad
+// Códigos postales de Bizkaia por municipio. Los municipios que comparten
+// código aparecen agrupados en la misma opción.
 const CODIGOS_POSTALES_VIZCAYA = [
   { codigo: "48001", municipio: "Bilbao" },
+  { codigo: "48002", municipio: "Bilbao" },
+  { codigo: "48003", municipio: "Bilbao" },
+  { codigo: "48004", municipio: "Bilbao" },
   { codigo: "48005", municipio: "Bilbao" },
+  { codigo: "48006", municipio: "Bilbao" },
+  { codigo: "48007", municipio: "Bilbao" },
+  { codigo: "48008", municipio: "Bilbao" },
   { codigo: "48009", municipio: "Bilbao" },
+  { codigo: "48010", municipio: "Bilbao" },
+  { codigo: "48011", municipio: "Bilbao" },
+  { codigo: "48012", municipio: "Bilbao" },
   { codigo: "48013", municipio: "Bilbao" },
+  { codigo: "48014", municipio: "Bilbao" },
+  { codigo: "48015", municipio: "Bilbao" },
   { codigo: "48100", municipio: "Mungia" },
-  { codigo: "48140", municipio: "Igorre" },
+  { codigo: "48110", municipio: "Gatika" },
+  { codigo: "48111", municipio: "Laukiz" },
+  { codigo: "48112", municipio: "Maruri-Jatabe" },
+  { codigo: "48113", municipio: "Gamiz-Fika" },
+  { codigo: "48114", municipio: "Arrieta / Zeanuri" },
+  { codigo: "48115", municipio: "Morga" },
+  { codigo: "48116", municipio: "Fruiz" },
+  { codigo: "48120", municipio: "Meñaka" },
+  { codigo: "48130", municipio: "Bakio" },
+  { codigo: "48140", municipio: "Arantzazu / Igorre" },
+  { codigo: "48141", municipio: "Dima" },
+  { codigo: "48142", municipio: "Artea" },
+  { codigo: "48143", municipio: "Areatza" },
+  { codigo: "48145", municipio: "Ubide" },
+  { codigo: "48150", municipio: "Sondika" },
   { codigo: "48160", municipio: "Derio" },
   { codigo: "48170", municipio: "Zamudio" },
   { codigo: "48180", municipio: "Loiu" },
-  { codigo: "48200", municipio: "Durango" },
+  { codigo: "48190", municipio: "Sopuerta" },
+  { codigo: "48191", municipio: "Galdames" },
+  { codigo: "48192", municipio: "Gordexola" },
+  { codigo: "48195", municipio: "Larrabetzu" },
+  { codigo: "48196", municipio: "Lezama" },
+  { codigo: "48200", municipio: "Durango / Garai" },
+  { codigo: "48210", municipio: "Otxandio" },
+  { codigo: "48212", municipio: "Mañaria" },
+  { codigo: "48213", municipio: "Izurtza" },
+  { codigo: "48215", municipio: "Iurreta" },
   { codigo: "48220", municipio: "Abadiño" },
   { codigo: "48230", municipio: "Elorrio" },
   { codigo: "48240", municipio: "Berriz" },
+  { codigo: "48250", municipio: "Zaldibar" },
   { codigo: "48260", municipio: "Ermua" },
+  { codigo: "48269", municipio: "Mallabia" },
   { codigo: "48270", municipio: "Markina-Xemein" },
+  { codigo: "48277", municipio: "Etxebarria" },
+  { codigo: "48278", municipio: "Ziortza-Bolibar" },
   { codigo: "48280", municipio: "Lekeitio" },
+  { codigo: "48287", municipio: "Ea" },
+  { codigo: "48288", municipio: "Ispaster" },
+  { codigo: "48289", municipio: "Amoroto / Gizaburuaga / Mendexa" },
+  { codigo: "48291", municipio: "Atxondo" },
   { codigo: "48300", municipio: "Gernika-Lumo" },
+  { codigo: "48309", municipio: "Errigoiti" },
+  { codigo: "48310", municipio: "Elantxobe" },
+  { codigo: "48311", municipio: "Ibarrangelu" },
+  { codigo: "48312", municipio: "Nabarniz" },
+  { codigo: "48313", municipio: "Ereño" },
+  { codigo: "48314", municipio: "Gautegiz Arteaga" },
+  { codigo: "48315", municipio: "Kortezubi" },
+  { codigo: "48320", municipio: "Ajangiz" },
+  { codigo: "48330", municipio: "Lemoa" },
   { codigo: "48340", municipio: "Amorebieta-Etxano" },
+  { codigo: "48350", municipio: "Busturia" },
   { codigo: "48360", municipio: "Mundaka" },
   { codigo: "48370", municipio: "Bermeo" },
+  { codigo: "48380", municipio: "Aulesti" },
+  { codigo: "48381", municipio: "Munitibar-Arbatzegi Gerrikaitz" },
+  { codigo: "48382", municipio: "Mendata" },
+  { codigo: "48383", municipio: "Arratzu" },
+  { codigo: "48390", municipio: "Bedia" },
+  { codigo: "48392", municipio: "Muxika" },
+  { codigo: "48393", municipio: "Forua" },
+  { codigo: "48394", municipio: "Murueta" },
+  { codigo: "48395", municipio: "Sukarrieta" },
   { codigo: "48410", municipio: "Orozko" },
-  { codigo: "48430", municipio: "Zeanuri" },
   { codigo: "48450", municipio: "Etxebarri" },
-  { codigo: "48460", municipio: "Orduña" },
-  { codigo: "48480", municipio: "Arrigorriaga" },
+  { codigo: "48460", municipio: "Urduña-Orduña" },
+  { codigo: "48480", municipio: "Arrigorriaga / Zaratamo" },
+  { codigo: "48490", municipio: "Ugao-Miraballes" },
+  { codigo: "48498", municipio: "Arakaldo / Arrankudiaga" },
+  { codigo: "48499", municipio: "Zeberio" },
+  { codigo: "48500", municipio: "Abanto y Ciérvana-Abanto Zierbena" },
+  { codigo: "48508", municipio: "Zierbena" },
+  { codigo: "48510", municipio: "Valle de Trápaga-Trapagaran" },
   { codigo: "48530", municipio: "Ortuella" },
-  { codigo: "48540", municipio: "Alonsotegi" },
   { codigo: "48550", municipio: "Muskiz" },
   { codigo: "48600", municipio: "Sopelana" },
   { codigo: "48610", municipio: "Urduliz" },
-  { codigo: "48620", municipio: "Plentzia" },
+  { codigo: "48620", municipio: "Lemoiz / Plentzia" },
   { codigo: "48630", municipio: "Gorliz" },
   { codigo: "48640", municipio: "Berango" },
   { codigo: "48650", municipio: "Barrika" },
   { codigo: "48700", municipio: "Ondarroa" },
+  { codigo: "48710", municipio: "Berriatua" },
   { codigo: "48800", municipio: "Balmaseda" },
-  { codigo: "48830", municipio: "Güeñes" },
+  { codigo: "48810", municipio: "Alonsotegi" },
+  { codigo: "48840", municipio: "Güeñes" },
   { codigo: "48860", municipio: "Zalla" },
-  { codigo: "48870", municipio: "Valle de Carranza" },
+  { codigo: "48879", municipio: "Artzentales" },
+  { codigo: "48880", municipio: "Trucios-Turtzioz" },
+  { codigo: "48891", municipio: "Karrantza Harana / Valle de Carranza" },
+  { codigo: "48895", municipio: "Lanestosa" },
   { codigo: "48901", municipio: "Barakaldo" },
+  { codigo: "48902", municipio: "Barakaldo" },
+  { codigo: "48903", municipio: "Barakaldo" },
   { codigo: "48910", municipio: "Sestao" },
   { codigo: "48920", municipio: "Portugalete" },
-  { codigo: "48930", municipio: "Getxo (Las Arenas)" },
+  { codigo: "48930", municipio: "Getxo" },
   { codigo: "48940", municipio: "Leioa" },
   { codigo: "48950", municipio: "Erandio" },
   { codigo: "48960", municipio: "Galdakao" },
   { codigo: "48970", municipio: "Basauri" },
   { codigo: "48980", municipio: "Santurtzi" },
-  { codigo: "48991", municipio: "Getxo (Algorta)" },
+  { codigo: "48991", municipio: "Getxo" },
+  { codigo: "48992", municipio: "Getxo" },
+  { codigo: "48993", municipio: "Getxo" },
 ];
 
 export default function ContratoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [contratos, setContratos] = useState<any[]>([]);
+  const [contratos, setContratos] = useState<ContratoRecord[]>([]);
   const [contratosLoading, setContratosLoading] = useState(false);
   const router = useRouter();
 
@@ -265,6 +355,123 @@ export default function ContratoPage() {
     window.location.reload();
   };
 
+  const mostrarEnlacesFirma = (links: { role: string; link: string }[]) => {
+    Modal.info({
+      title: "Enlaces de firma",
+      width: 640,
+      okText: "Cerrar",
+      content: (
+        <div>
+          <p style={{ marginBottom: 12 }}>
+            Envía cada enlace a la persona correspondiente. Con el enlace puede ver el
+            documento y firmarlo, sin necesidad de correo ni de crearse una cuenta.
+          </p>
+          {links.map((l) => (
+            <div key={l.role} style={{ marginBottom: 16 }}>
+              <Text strong>{l.role}</Text>
+              <Input.TextArea
+                value={l.link}
+                readOnly
+                autoSize
+                onFocus={(e) => e.target.select()}
+                style={{ marginTop: 4, fontSize: 12 }}
+              />
+              <Space style={{ marginTop: 4 }}>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(l.link);
+                    message.success(`Enlace de ${l.role} copiado`);
+                  }}
+                >
+                  Copiar enlace
+                </Button>
+                <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                  Abrir
+                </Button>
+              </Space>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
+
+  const descargarPdf = async (record: ContratoRecord) => {
+    const key = `descarga-${record._id}`;
+    message.loading({ content: "Generando PDF...", key });
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:3001/api/v1/contrato/${record._id}/descargar`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!response.ok) {
+        const detalle = await response.text();
+        throw new Error(`${response.status} — ${detalle.slice(0, 200)}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      // El enlace debe estar en el DOM para que el click dispare la descarga
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `contrato-${record.nombretrabajador || record._id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+
+      message.success({ content: "PDF descargado", key });
+    } catch (err) {
+      console.error("Error descargando PDF:", err);
+      message.error({
+        content: `No se pudo descargar el PDF: ${(err as Error).message}`,
+        key,
+        duration: 6,
+      });
+    }
+  };
+
+  const eliminarContrato = (record: ContratoRecord) => {
+    Modal.confirm({
+      title: "Eliminar contrato",
+      icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+      content: (
+        <div>
+          <p>
+            Se eliminará el contrato de{" "}
+            <strong>{record.nombretrabajador || "esta trabajadora"}</strong>.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            Los enlaces de firma dejarán de funcionar y no se podrá recuperar.
+          </p>
+        </div>
+      ),
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(`http://localhost:3001/api/v1/contrato/${record._id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error(`${res.status}`);
+          message.success("Contrato eliminado");
+          cargarContratos();
+        } catch (err) {
+          console.error("Error eliminando contrato:", err);
+          message.error("No se pudo eliminar el contrato");
+        }
+      },
+    });
+  };
+
   const onFinish = async (values: FormValues) => {
     // Validación de fechas
     if (values.fechacontrato) {
@@ -285,7 +492,6 @@ export default function ContratoPage() {
         nomempleador: values.nomempleador || "",
         tipoDocumentoEmpleador: values.tipoDocumentoEmpleador || "NIF",
         nifempleador: values.nifempleador || "",
-        correoempleador: values.correoempleador || "",
         regimen: cuenta.regimen,
         codigo: cuenta.codigo,
         prov: cuenta.prov,
@@ -297,7 +503,6 @@ export default function ContratoPage() {
         nombretrabajador: values.nombretrabajador || "",
         tipoDocumentoTrabajador: values.tipoDocumentoTrabajador || "NIE",
         niftrabajador: values.niftrabajador || "",
-        correoempleado: values.correotrabajador || "",
         fechanactrabajador: formatearFecha(values.fechanactrabajador, "completa"),
         numafiliaciontrabajador: values.numafiliaciontrabajador || "",
         nivelformativotrabajador: values.nivelformativotrabajador || "",
@@ -330,27 +535,63 @@ export default function ContratoPage() {
         }
       );
 
-      const responseData = await response.text();
-      console.log("Response:", responseData);
-
       message.destroy("sending");
 
       if (response.ok) {
-        message.success("✓ Contrato enviado correctamente");
+        const resultado = await response.json();
+        const links: { role: string; link: string }[] = resultado?.data?.signingLinks || [];
+
+        message.success("✓ Contrato generado correctamente");
+        // Refrescamos ya, para que aparezca en la tabla aunque se cierre el
+        // modal sin pulsar "Cerrar".
+        cargarContratos();
         setTimeout(() => {
           Modal.success({
-            title: "¡Contrato Enviado Correctamente!",
+            title: "¡Contrato Generado Correctamente!",
             icon: <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 48 }} />,
+            width: 640,
             content: (
               <div>
-                <p style={{ marginBottom: 12 }}>
-                  ✓ La invitación a la firma ha sido enviada a los correos correspondientes.
-                </p>
-                <p style={{ marginBottom: 12 }}>
-                  ✓ Puedes ver el documento en <strong>SignNow</strong>
-                </p>
-                <p>
-                  ✓ Una vez se firme, se guardará automáticamente en <strong>Google Drive</strong>
+                {links.length > 0 ? (
+                  <>
+                    <p style={{ marginBottom: 12 }}>
+                      Comparte estos enlaces para que cada parte firme. No hace falta
+                      correo: con el enlace se puede ver el documento y firmarlo.
+                    </p>
+                    {links.map((l) => (
+                      <div key={l.role} style={{ marginBottom: 12 }}>
+                        <Text strong>{l.role}</Text>
+                        <Input.TextArea
+                          value={l.link}
+                          readOnly
+                          autoSize
+                          onFocus={(e) => e.target.select()}
+                          style={{ marginTop: 4, fontSize: 12 }}
+                        />
+                        <Space style={{ marginTop: 4 }}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            onClick={() => {
+                              navigator.clipboard.writeText(l.link);
+                              message.success(`Enlace de ${l.role} copiado`);
+                            }}
+                          >
+                            Copiar enlace
+                          </Button>
+                          <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                            Abrir
+                          </Button>
+                        </Space>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p>✓ El contrato se generó correctamente.</p>
+                )}
+                <p style={{ marginTop: 12, marginBottom: 0 }}>
+                  Si cierras esta ventana, puedes volver a ver los enlaces con el botón{" "}
+                  <strong>Enlaces</strong> del <strong>Historial de Contratos</strong>.
                 </p>
               </div>
             ),
@@ -358,7 +599,6 @@ export default function ContratoPage() {
             onOk: () => {
               form.resetFields();
               cargarContratos();
-              router.push("/formularios");
             },
           });
         }, 500);
@@ -475,18 +715,6 @@ export default function ContratoPage() {
                     <Input placeholder="12345678X" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Correo del Empleador"
-                    name="correoempleador"
-                    rules={[
-                      { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" }
-                    ]}
-                  >
-                    <Input placeholder="empleador@empresa.com" type="email" />
-                  </Form.Item>
-                </Col>
               </Row>
             </Card>
 
@@ -569,18 +797,6 @@ export default function ContratoPage() {
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Correo de la Trabajadora"
-                    name="correotrabajador"
-                    rules={[
-                      { required: true, message: "El correo es requerido" },
-                      { type: "email", message: "Ingresa un correo válido" }
-                    ]}
-                  >
-                    <Input placeholder="trabajadora@email.com" type="email" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
                     label="Fecha de Nacimiento"
                     name="fechanactrabajador"
                   >
@@ -643,18 +859,28 @@ export default function ContratoPage() {
                     <Input placeholder="Ej. España" />
                   </Form.Item>
                 </Col>
+              </Row>
+            </Card>
+
+            {/* Sección: Datos Varios */}
+            <Card title="Datos del Contrato" style={{ marginBottom: "24px" }}>
+              <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Código Postal (Vizcaya)"
+                    label="Código Postal (Bizkaia)"
                     name="codPostal"
+                    tooltip="Puedes buscar por código o por municipio. Si necesitas uno que no esté en la lista, escríbelo directamente."
                   >
-                    <Select placeholder="Selecciona el código postal" showSearch optionFilterProp="children">
-                      {CODIGOS_POSTALES_VIZCAYA.map((cp) => (
-                        <Select.Option key={cp.codigo} value={cp.codigo}>
-                          {cp.codigo} — {cp.municipio}
-                        </Select.Option>
-                      ))}
-                    </Select>
+                    <AutoComplete
+                      placeholder="Busca por código o municipio"
+                      filterOption={(input, option) =>
+                        String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                      }
+                      options={CODIGOS_POSTALES_VIZCAYA.map((cp) => ({
+                        value: cp.codigo,
+                        label: `${cp.codigo} — ${cp.municipio}`,
+                      }))}
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
@@ -668,12 +894,6 @@ export default function ContratoPage() {
                     </Select>
                   </Form.Item>
                 </Col>
-              </Row>
-            </Card>
-
-            {/* Sección: Datos Varios */}
-            <Card title="Datos del Contrato" style={{ marginBottom: "24px" }}>
-              <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
                     label="Fecha del Contrato"
@@ -804,7 +1024,7 @@ export default function ContratoPage() {
                       dataIndex: "status",
                       key: "status",
                       render: (status) => {
-                        const statusMap: Record<string, any> = {
+                        const statusMap: Record<string, React.ReactNode> = {
                           pendiente: (
                             <Tag color="default">Pendiente</Tag>
                           ),
@@ -882,12 +1102,6 @@ export default function ContratoPage() {
                                       <Descriptions.Item label="Fecha Contrato">
                                         {record.fechacontrato}
                                       </Descriptions.Item>
-                                      <Descriptions.Item label="Correo Empleado">
-                                        {record.correoempleado}
-                                      </Descriptions.Item>
-                                      <Descriptions.Item label="Correo Empleador">
-                                        {record.correoempleador}
-                                      </Descriptions.Item>
                                     </Descriptions>
 
                                     {record.lastError && (
@@ -915,31 +1129,33 @@ export default function ContratoPage() {
                           >
                             Ver
                           </Button>
-                          {record.status === "error" && (
+                          {(record.signingLinks || []).length > 0 && (
                             <Button
                               type="link"
                               size="small"
-                              onClick={() => {
-                                Modal.confirm({
-                                  title: "Reintentar Contrato",
-                                  content:
-                                    "¿Deseas reintentar el envío de este contrato?",
-                                  onOk: async () => {
-                                    message.info("Función de reintento en desarrollo");
-                                  },
-                                });
-                              }}
+                              onClick={() => mostrarEnlacesFirma(record.signingLinks || [])}
                             >
-                              Reintentar
+                              Enlaces
                             </Button>
                           )}
+                          <Button type="link" size="small" onClick={() => descargarPdf(record)}>
+                            Descargar PDF
+                          </Button>
+                          <Button
+                            type="link"
+                            size="small"
+                            danger
+                            onClick={() => eliminarContrato(record)}
+                          >
+                            Eliminar
+                          </Button>
                         </Space>
                       ),
-                      width: 120,
+                      width: 300,
                     },
                   ]}
                   size="small"
-                  scroll={{ x: 1000 }}
+                  scroll={{ x: 1100 }}
                 />
               ) : (
                 <Empty

@@ -15,6 +15,11 @@ import {
   message,
   Modal,
   DatePicker,
+  Table,
+  Tag,
+  Empty,
+  Spin,
+  Divider,
 } from "antd";
 import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import { ArrowLeftOutlined } from "@ant-design/icons";
@@ -26,6 +31,21 @@ import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 
 const { Title, Text } = Typography;
+
+interface DocumentoGrupoRecord {
+  _id: string;
+  nombres?: string;
+  primerApellido?: string;
+  segundoApellido?: string;
+  numeroDocumento?: string;
+  nif?: string;
+  municipio?: string;
+  fechaFirma?: string;
+  status?: string;
+  createdAt?: string;
+  signingLinks?: { role: string; link: string }[];
+  lastError?: { stage?: string; message?: string };
+}
 
 interface FormValues {
   primerApellido?: string;
@@ -50,6 +70,9 @@ interface FormValues {
   codigoSwift?: string;
   numeroCuenta?: string;
   cuentaCotizacion?: string;
+  correo?: string;
+  telefono?: string;
+  razonSocial?: string;
   lugarFirma?: string;
   fechaFirma?: Dayjs;
 }
@@ -67,6 +90,8 @@ export default function DocumentosGrupoPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [documentos, setDocumentos] = useState<DocumentoGrupoRecord[]>([]);
+  const [documentosLoading, setDocumentosLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -103,6 +128,146 @@ export default function DocumentosGrupoPage() {
     })();
   }, [form]);
 
+  const cargarDocumentos = async () => {
+    setDocumentosLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("http://localhost:3001/api/v1/documentos-grupo/lista", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDocumentos(data.data || []);
+      }
+    } catch (error) {
+      console.error("Error cargando documentos:", error);
+    } finally {
+      setDocumentosLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDocumentos();
+  }, []);
+
+  const nombreDe = (r: DocumentoGrupoRecord) =>
+    `${r.nombres || ""} ${r.primerApellido || ""} ${r.segundoApellido || ""}`
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const mostrarEnlacesFirma = (links: { role: string; link: string }[]) => {
+    Modal.info({
+      title: "Enlaces de firma",
+      width: 640,
+      okText: "Cerrar",
+      content: (
+        <div>
+          <p style={{ marginBottom: 12 }}>
+            Con este enlace se pueden ver y firmar los tres documentos de una vez,
+            sin necesidad de correo ni de crear una cuenta.
+          </p>
+          {links.map((l) => (
+            <div key={l.role} style={{ marginBottom: 16 }}>
+              <Text strong>{l.role}</Text>
+              <Input.TextArea
+                value={l.link}
+                readOnly
+                autoSize
+                onFocus={(e) => e.target.select()}
+                style={{ marginTop: 4, fontSize: 12 }}
+              />
+              <Space style={{ marginTop: 4 }}>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(l.link);
+                    message.success("Enlace copiado");
+                  }}
+                >
+                  Copiar enlace
+                </Button>
+                <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                  Abrir
+                </Button>
+              </Space>
+            </div>
+          ))}
+        </div>
+      ),
+    });
+  };
+
+  const descargarPdf = async (record: DocumentoGrupoRecord) => {
+    const key = `descarga-${record._id}`;
+    message.loading({ content: "Generando PDF...", key });
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:3001/api/v1/documentos-grupo/${record._id}/descargar`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) {
+        const detalle = await response.text();
+        throw new Error(`${response.status} — ${detalle.slice(0, 200)}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `documentos-${nombreDe(record) || record._id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+
+      message.success({ content: "PDF descargado", key });
+    } catch (err) {
+      console.error("Error descargando PDF:", err);
+      message.error({
+        content: `No se pudo descargar el PDF: ${(err as Error).message}`,
+        key,
+        duration: 6,
+      });
+    }
+  };
+
+  const eliminarDocumento = (record: DocumentoGrupoRecord) => {
+    Modal.confirm({
+      title: "Eliminar documentos",
+      icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+      content: (
+        <div>
+          <p>
+            Se eliminarán los documentos de <strong>{nombreDe(record) || "esta persona"}</strong>.
+          </p>
+          <p style={{ marginBottom: 0 }}>
+            El enlace de firma dejará de funcionar y no se podrá recuperar.
+          </p>
+        </div>
+      ),
+      okText: "Eliminar",
+      okButtonProps: { danger: true },
+      cancelText: "Cancelar",
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(
+            `http://localhost:3001/api/v1/documentos-grupo/${record._id}`,
+            { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (!res.ok) throw new Error(`${res.status}`);
+          message.success("Documentos eliminados");
+          cargarDocumentos();
+        } catch (err) {
+          console.error("Error eliminando documentos:", err);
+          message.error("No se pudieron eliminar los documentos");
+        }
+      },
+    });
+  };
+
   const handleRetryFetch = () => {
     const params = new URLSearchParams(window.location.search);
     const idEmpleado = params.get("idEmpleado");
@@ -119,23 +284,19 @@ export default function DocumentosGrupoPage() {
     message.loading({ content: "Enviando documentos...", key: "sending" });
 
     try {
-      const payload = [
-        {
-          plantilla: "grupo",
-          datos: {
-            ...values,
-            fechaFirma: formatearFecha(values.fechaFirma, "completa"),
-          },
-          timestamp: {},
-        },
-      ];
+      const payload = {
+        ...values,
+        fechaFirma: formatearFecha(values.fechaFirma, "completa"),
+      };
 
+      const token = localStorage.getItem("token");
       const response = await fetch(
-        "https://hook.eu2.make.com/tom528yfgpx6y2dxnmw8uir90t1g1a8i",
+        "http://localhost:3001/api/v1/documentos-grupo/crear",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
         }
@@ -144,28 +305,55 @@ export default function DocumentosGrupoPage() {
       message.destroy("sending");
 
       if (response.ok) {
-        message.success("✓ Documentos enviados correctamente");
+        const resultado = await response.json();
+        const links: { role: string; link: string }[] = resultado?.data?.signingLinks || [];
+
+        message.success("✓ Documentos generados correctamente");
+        cargarDocumentos();
         setTimeout(() => {
           Modal.success({
-            title: "¡Documentos Enviados Correctamente!",
+            title: "¡Documentos Generados Correctamente!",
             icon: <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 48 }} />,
+            width: 640,
             content: (
               <div>
                 <p style={{ marginBottom: 12 }}>
-                  ✓ La invitación a la firma ha sido enviada a los correos correspondientes.
+                  Se han generado los tres modelos (FR103, TA1 y FR con CCC) en un único
+                  documento. Comparte este enlace para que se firme; no hace falta correo.
                 </p>
-                <p style={{ marginBottom: 12 }}>
-                  ✓ Puedes ver los documentos en <strong>SignNow</strong>
-                </p>
-                <p>
-                  ✓ Una vez se firmen, se guardarán automáticamente en <strong>Google Drive</strong>
-                </p>
+                {links.map((l) => (
+                  <div key={l.role} style={{ marginBottom: 12 }}>
+                    <Text strong>{l.role}</Text>
+                    <Input.TextArea
+                      value={l.link}
+                      readOnly
+                      autoSize
+                      onFocus={(e) => e.target.select()}
+                      style={{ marginTop: 4, fontSize: 12 }}
+                    />
+                    <Space style={{ marginTop: 4 }}>
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => {
+                          navigator.clipboard.writeText(l.link);
+                          message.success("Enlace copiado");
+                        }}
+                      >
+                        Copiar enlace
+                      </Button>
+                      <Button size="small" onClick={() => window.open(l.link, "_blank")}>
+                        Abrir
+                      </Button>
+                    </Space>
+                  </div>
+                ))}
               </div>
             ),
             okText: "Cerrar",
             onOk: () => {
               form.resetFields();
-              router.push("/formularios");
+              cargarDocumentos();
             },
           });
         }, 500);
@@ -456,6 +644,40 @@ export default function DocumentosGrupoPage() {
               </Row>
             </Card>
 
+            {/* Sección: Contacto y empresa (los piden el TA1, el FR103 y el FR con CCC) */}
+            <Card title="Contacto y Empresa" style={{ marginBottom: "24px" }}>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="Correo Electrónico"
+                    name="correo"
+                    tooltip="Aparece en el modelo TA1"
+                    rules={[{ type: "email", message: "Ingresa un correo válido" }]}
+                  >
+                    <Input placeholder="ejemplo@email.com" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="Teléfono"
+                    name="telefono"
+                    tooltip="Aparece en el TA1 y en el FR103"
+                  >
+                    <Input placeholder="Ej. 600111222" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="Razón Social del Empleador"
+                    name="razonSocial"
+                    tooltip="Aparece en el FR con CCC"
+                  >
+                    <Input placeholder="Ej. CuidoFam SL" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
             {/* Sección: Firma */}
             <Card title="Información de Firma" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
@@ -490,6 +712,120 @@ export default function DocumentosGrupoPage() {
               </Space>
             </Form.Item>
           </Form>
+
+          {/* Historial */}
+          <Divider style={{ marginTop: "40px" }} />
+
+          <Title level={3} style={{ marginBottom: "16px", marginTop: "24px" }}>
+            Historial de Documentos
+          </Title>
+
+          <Card>
+            <Spin spinning={documentosLoading}>
+              {documentos.length > 0 ? (
+                <Table
+                  dataSource={documentos}
+                  rowKey="_id"
+                  pagination={{ pageSize: 10 }}
+                  size="small"
+                  scroll={{ x: 900 }}
+                  columns={[
+                    {
+                      title: "Persona",
+                      key: "persona",
+                      render: (_, record) => (
+                        <Space direction="vertical" size={0}>
+                          <Text strong>{nombreDe(record) || "-"}</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {record.numeroDocumento || record.nif}
+                          </Text>
+                        </Space>
+                      ),
+                      width: 200,
+                    },
+                    {
+                      title: "Municipio",
+                      dataIndex: "municipio",
+                      key: "municipio",
+                      render: (text) => <Text>{text || "-"}</Text>,
+                      width: 130,
+                    },
+                    {
+                      title: "Fecha firma",
+                      dataIndex: "fechaFirma",
+                      key: "fechaFirma",
+                      render: (text) => <Text>{text || "-"}</Text>,
+                      width: 140,
+                    },
+                    {
+                      title: "Estado",
+                      dataIndex: "status",
+                      key: "status",
+                      render: (status) => {
+                        const mapa: Record<string, React.ReactNode> = {
+                          pendiente: <Tag color="default">Pendiente</Tag>,
+                          campos_llenados: <Tag color="processing">Generado</Tag>,
+                          invitacion_enviada: <Tag color="blue">Pendiente de firma</Tag>,
+                          firmando: <Tag color="cyan">Firmando</Tag>,
+                          firmado: <Tag color="success">✓ Firmado</Tag>,
+                          error: <Tag color="error">Error</Tag>,
+                        };
+                        return mapa[status] || <Tag>{status}</Tag>;
+                      },
+                      width: 150,
+                    },
+                    {
+                      title: "Creado",
+                      dataIndex: "createdAt",
+                      key: "createdAt",
+                      render: (date) =>
+                        date
+                          ? new Date(date).toLocaleDateString("es-ES", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "-",
+                      width: 140,
+                    },
+                    {
+                      title: "Acciones",
+                      key: "acciones",
+                      render: (_, record) => (
+                        <Space>
+                          {(record.signingLinks || []).length > 0 && (
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => mostrarEnlacesFirma(record.signingLinks || [])}
+                            >
+                              Enlaces
+                            </Button>
+                          )}
+                          <Button type="link" size="small" onClick={() => descargarPdf(record)}>
+                            Descargar PDF
+                          </Button>
+                          <Button
+                            type="link"
+                            size="small"
+                            danger
+                            onClick={() => eliminarDocumento(record)}
+                          >
+                            Eliminar
+                          </Button>
+                        </Space>
+                      ),
+                      width: 260,
+                    },
+                  ]}
+                />
+              ) : (
+                <Empty description="No hay documentos registrados" style={{ paddingTop: 20 }} />
+              )}
+            </Spin>
+          </Card>
         </div>
       </div>
     </div>
