@@ -9,3 +9,7 @@
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "https://backend-sms-production-0b80.up.railway.app/api/v1";
+
+/** Base de CloudNavis. Mismo criterio: valor real por defecto, variable para cambiarlo. */
+export const CLOUDNAVIS_URL =
+  process.env.NEXT_PUBLIC_CLOUDNAVIS_API_URL || "https://cloudnavis.com";

@@ -1,3 +1,4 @@
+import { CLOUDNAVIS_URL } from "@/lib/config";
 // CloudNavis API Client
 // Interfaces and functions for fetching employee and employer data from CloudNavis
 
@@ -75,7 +76,7 @@ export async function fetchCloudnavisEmpleado(
   idEmpleado: string,
   token: string
 ): Promise<CloudnavisEmpleado> {
-  const baseUrl = process.env.NEXT_PUBLIC_CLOUDNAVIS_API_URL;
+  const baseUrl = CLOUDNAVIS_URL;
 
   if (!baseUrl) {
     throw new Error('NETWORK_ERROR');
@@ -151,7 +152,7 @@ export async function fetchCloudnavisEmpleador(
   idCliente: string,
   token: string
 ): Promise<CloudnavisEmpleador> {
-  const baseUrl = process.env.NEXT_PUBLIC_CLOUDNAVIS_API_URL;
+  const baseUrl = CLOUDNAVIS_URL;
 
   if (!baseUrl) {
     throw new Error('NETWORK_ERROR');
