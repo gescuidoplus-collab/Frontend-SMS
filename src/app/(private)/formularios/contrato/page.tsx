@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
 import { mapEmpleadoToContrato, mapEmpleadorToContrato } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import { obtenerToken } from "@/lib/session";
 
 const { Title, Text } = Typography;
 
@@ -284,7 +285,7 @@ export default function ContratoPage() {
   const cargarContratos = async () => {
     setContratosLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
       const response = await fetch(
         "http://localhost:3001/api/v1/contrato/lista",
         {
@@ -402,7 +403,7 @@ export default function ContratoPage() {
     const key = `descarga-${record._id}`;
     message.loading({ content: "Generando PDF...", key });
     try {
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
       const response = await fetch(
         `http://localhost:3001/api/v1/contrato/${record._id}/descargar`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -456,7 +457,7 @@ export default function ContratoPage() {
       cancelText: "Cancelar",
       onOk: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = obtenerToken();
           const res = await fetch(`http://localhost:3001/api/v1/contrato/${record._id}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
@@ -521,7 +522,7 @@ export default function ContratoPage() {
         anofirma,
       };
 
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
 
       const response = await fetch(
         "http://localhost:3001/api/v1/contrato/crear",

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button, Form, Input } from "antd";
+import { Button, Form, Input, message } from "antd";
 import api from "@/lib/axios";
+import { guardarSesion } from "@/lib/session";
 import Image from "next/image";
 
 interface LoginFormValues {
@@ -13,18 +13,24 @@ interface LoginFormValues {
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const onFinish = async (values: LoginFormValues) => {
     setLoading(true);
     try {
       const response = await api.post("/auth/login/", values);
-      localStorage.setItem("token", response?.data?.accessToken);
-      document.cookie = `token=${response?.data?.accessToken}; path=/;`;
-      router.push("/dashboard");
+      const token = response?.data?.accessToken;
+
+      if (!token) {
+        throw new Error("La respuesta del servidor no incluyó el token");
+      }
+
+      guardarSesion(token);
+      // Recarga completa en vez de router.push: así el middleware ve la cookie
+      // recién puesta y no rebota la navegación.
+      window.location.href = "/dashboard";
     } catch (error) {
       console.error("Login failed:", error);
-    } finally {
+      message.error("No se pudo iniciar sesión. Revisa el correo y la contraseña.");
       setLoading(false);
     }
   };

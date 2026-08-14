@@ -36,6 +36,7 @@ import { useRouter } from "next/navigation";
 import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
 import { mapEmpleadoToFiniquito, mapEmpleadorToFiniquito } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import { obtenerToken } from "@/lib/session";
 
 const { Title, Text } = Typography;
 
@@ -344,7 +345,7 @@ export default function FiniquitoPage() {
   useEffect(() => {
     (async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = obtenerToken();
         const res = await fetch(
           "http://localhost:3001/api/v1/finiquito/texto-por-defecto",
           { headers: { Authorization: `Bearer ${token}` } }
@@ -365,7 +366,7 @@ export default function FiniquitoPage() {
   const cargarFiniquitos = async () => {
     setFiniquitosLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
       const response = await fetch(
         "http://localhost:3001/api/v1/finiquito/lista",
         {
@@ -533,7 +534,7 @@ export default function FiniquitoPage() {
     const key = `descarga-${record._id}`;
     message.loading({ content: "Generando PDF...", key });
     try {
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
       const response = await fetch(
         `http://localhost:3001/api/v1/finiquito/${record._id}/descargar`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -590,7 +591,7 @@ export default function FiniquitoPage() {
       cancelText: "Cancelar",
       onOk: async () => {
         try {
-          const token = localStorage.getItem("token");
+          const token = obtenerToken();
           const res = await fetch(
             `http://localhost:3001/api/v1/finiquito/${record._id}`,
             { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
@@ -757,7 +758,7 @@ export default function FiniquitoPage() {
       };
 
       // Obtener token JWT del localStorage
-      const token = localStorage.getItem("token");
+      const token = obtenerToken();
 
       const response = await fetch(
         "http://localhost:3001/api/v1/finiquito/crear",

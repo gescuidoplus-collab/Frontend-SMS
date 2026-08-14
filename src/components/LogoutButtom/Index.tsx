@@ -1,17 +1,22 @@
 "use client";
 
 import { Button } from "antd";
-import { useRouter } from "next/navigation";
 import { logout as serverLogout } from "./action";
+import { cerrarSesion } from "@/lib/session";
 import { LogoutOutlined } from "@ant-design/icons";
 
 export default function LogoutButton() {
-  const router = useRouter();
-
   const handleLogout = async () => {
-    await serverLogout();
-    localStorage.removeItem("token");
-    router.push("/login");
+    // Se limpia por los dos lados: la cookie del servidor y la copia del
+    // cliente. Si solo se borrara una, el middleware y las páginas se
+    // contradirían y la navegación entraría en bucle.
+    try {
+      await serverLogout();
+    } catch (error) {
+      console.error("Error cerrando sesión en el servidor:", error);
+    }
+    cerrarSesion();
+    window.location.href = "/login";
   };
 
   return (
