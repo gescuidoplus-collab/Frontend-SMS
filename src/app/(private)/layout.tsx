@@ -5,6 +5,7 @@ import { Layout, Menu, Divider } from "antd";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "@/components/LogoutButtom/Index";
+import { obtenerToken } from "@/lib/session";
 import { MessageOutlined, CalculatorOutlined, FileTextOutlined } from "@ant-design/icons";
 
 const { Header, Content, Sider } = Layout;
@@ -18,11 +19,12 @@ export default function PrivateLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.replace("/login");
+    // obtenerToken limpia también la cookie si el token ha caducado, para que
+    // el middleware no vuelva a mandarnos aquí y se forme un bucle.
+    if (!obtenerToken()) {
+      window.location.href = "/login";
     }
-  }, [router]);
+  }, []);
 
   const handleMenuClick = (key: string) => {
     const routes: Record<string, string> = {

@@ -1,34 +1,35 @@
 import axios from "axios";
+import { obtenerToken, cerrarSesion } from "./session";
 
 const api = axios.create({
-  baseURL:  "https://backend-sms-production-0b80.up.railway.app/api/v1",
+  baseURL: "https://backend-sms-production-0b80.up.railway.app/api/v1",
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    const token = obtenerToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-let isLoggingOut = false;
+let cerrandoSesion = false;
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && typeof window !== "undefined" && !isLoggingOut) {
-      const isLoginPage = window.location.pathname === "/login" || window.location.pathname.startsWith("/login");
+    if (error.response?.status === 401 && typeof window !== "undefined" && !cerrandoSesion) {
+      const enLogin = window.location.pathname.startsWith("/login");
 
-      if (!isLoginPage) {
-        isLoggingOut = true;
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+      if (!enLogin) {
+        cerrandoSesion = true;
+        // Hay que borrar también la cookie: si solo se limpiara el
+        // localStorage, el middleware seguiría creyendo que hay sesión y
+        // devolvería a /dashboard en bucle.
+        cerrarSesion();
         window.location.href = "/login?expired=true";
       }
     }

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Button, Empty } from "antd";
 import { useRouter } from "next/navigation";
+import { obtenerToken } from "@/lib/session";
 
 export default function NotFound() {
   const router = useRouter();
@@ -10,7 +11,7 @@ export default function NotFound() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = obtenerToken();
     setIsLoggedIn(!!token);
     setLoading(false);
   }, []);
