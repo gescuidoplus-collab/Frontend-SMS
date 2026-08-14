@@ -14,10 +14,11 @@ import {
 } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import { useParams } from "next/navigation";
+import { API_URL } from "@/lib/config";
 
 const { Title, Text } = Typography;
 
-const API_BASE = "http://localhost:3001/api/v1/firma";
+const API_BASE = `${API_URL}/firma`;
 
 interface FirmaInfo {
   tipo: "finiquito" | "contrato";

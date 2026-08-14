@@ -31,6 +31,7 @@ import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cl
 import { mapEmpleadoToContrato, mapEmpleadorToContrato } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 import { obtenerToken } from "@/lib/session";
+import { API_URL } from "@/lib/config";
 
 const { Title, Text } = Typography;
 
@@ -287,7 +288,7 @@ export default function ContratoPage() {
     try {
       const token = obtenerToken();
       const response = await fetch(
-        "http://localhost:3001/api/v1/contrato/lista",
+        `${API_URL}/contrato/lista`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -405,7 +406,7 @@ export default function ContratoPage() {
     try {
       const token = obtenerToken();
       const response = await fetch(
-        `http://localhost:3001/api/v1/contrato/${record._id}/descargar`,
+        `${API_URL}/contrato/${record._id}/descargar`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -458,7 +459,7 @@ export default function ContratoPage() {
       onOk: async () => {
         try {
           const token = obtenerToken();
-          const res = await fetch(`http://localhost:3001/api/v1/contrato/${record._id}`, {
+          const res = await fetch(`${API_URL}/contrato/${record._id}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -525,7 +526,7 @@ export default function ContratoPage() {
       const token = obtenerToken();
 
       const response = await fetch(
-        "http://localhost:3001/api/v1/contrato/crear",
+        `${API_URL}/contrato/crear`,
         {
           method: "POST",
           headers: {

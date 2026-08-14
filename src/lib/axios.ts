@@ -1,8 +1,9 @@
 import axios from "axios";
 import { obtenerToken, cerrarSesion } from "./session";
+import { API_URL } from "./config";
 
 const api = axios.create({
-  baseURL: "https://backend-sms-production-0b80.up.railway.app/api/v1",
+  baseURL: API_URL,
 });
 
 api.interceptors.request.use(
