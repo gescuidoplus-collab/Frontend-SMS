@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
-  InputNumber,
   Select,
   Button,
   Row,
@@ -21,7 +20,7 @@ import {
   Spin,
   Divider,
 } from "antd";
-import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
@@ -57,9 +56,7 @@ interface FormValues {
   sexo?: string;
   numeroDocumento?: string;
   tipoDocumento?: string;
-  diaNacimiento?: number;
-  mesNacimiento?: number;
-  anioNacimiento?: number;
+  fechaNacimiento?: Dayjs;
   tipoVia?: string;
   nombreVia?: string;
   bloque?: string;
@@ -111,8 +108,13 @@ export default function DocumentosGrupoPage() {
     (async () => {
       try {
         const empleado = await fetchCloudnavisEmpleado(idEmpleado, token);
-        const mapped = mapEmpleadoToDocumentosGrupo(empleado);
-        form.setFieldsValue(mapped);
+        const { diaNacimiento, mesNacimiento, anioNacimiento, ...mapped } =
+          mapEmpleadoToDocumentosGrupo(empleado);
+        const fechaNacimiento =
+          diaNacimiento && mesNacimiento && anioNacimiento
+            ? dayjs(`${anioNacimiento}-${mesNacimiento}-${diaNacimiento}`, "YYYY-M-D")
+            : undefined;
+        form.setFieldsValue({ ...mapped, fechaNacimiento });
       } catch (err) {
         const error = err as Error;
         if (error.message === "TOKEN_INVALID") {
@@ -134,15 +136,25 @@ export default function DocumentosGrupoPage() {
     setDocumentosLoading(true);
     try {
       const token = obtenerToken();
-      const res = await fetch(`${API_URL}/documentos-grupo/lista`, {
+      const res = await fetch(`${API_URL}/documentos-grupo/lista?limit=200`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setDocumentos(data.data || []);
+
+      if (!res.ok) {
+        // Sin este aviso la tabla se queda vacía sin explicar por qué (p. ej.
+        // con la sesión caducada el backend responde 403).
+        throw new Error(
+          res.status === 401 || res.status === 403
+            ? "Tu sesión ha caducado. Vuelve a iniciar sesión."
+            : `El servidor respondió ${res.status}`
+        );
       }
+
+      const data = await res.json();
+      setDocumentos(data.data || []);
     } catch (error) {
       console.error("Error cargando documentos:", error);
+      message.error(`No se pudo cargar el historial: ${(error as Error).message}`);
     } finally {
       setDocumentosLoading(false);
     }
@@ -286,9 +298,13 @@ export default function DocumentosGrupoPage() {
     message.loading({ content: "Enviando documentos...", key: "sending" });
 
     try {
+      const { fechaNacimiento, ...resto } = values;
       const payload = {
-        ...values,
+        ...resto,
         fechaFirma: formatearFecha(values.fechaFirma, "completa"),
+        diaNacimiento: fechaNacimiento?.date(),
+        mesNacimiento: fechaNacimiento ? fechaNacimiento.month() + 1 : undefined,
+        anioNacimiento: fechaNacimiento?.year(),
       };
 
       const token = obtenerToken();
@@ -360,6 +376,13 @@ export default function DocumentosGrupoPage() {
           });
         }, 500);
       } else {
+        // El backend explica en qué etapa falló; mostrarlo evita confundir un
+        // error del servidor con un campo del formulario sin rellenar.
+        const detalle = await response
+          .json()
+          .then((d) => d?.message || d?.error)
+          .catch(() => null);
+
         message.error("Error al enviar documentos");
         Modal.error({
           title: "Error al Enviar el Formulario",
@@ -367,13 +390,16 @@ export default function DocumentosGrupoPage() {
           content: (
             <div>
               <p style={{ marginBottom: 8 }}>
-                Hubo un problema al enviar el formulario. Por favor:
+                Hubo un problema al generar los documentos ({response.status}).
               </p>
-              <ul style={{ marginLeft: 20 }}>
-                <li>Verifica que todos los campos estén completos</li>
-                <li>Revisa tu conexión a internet</li>
-                <li>Intenta enviar el formulario nuevamente</li>
-              </ul>
+              {detalle && (
+                <p style={{ marginBottom: 8 }}>
+                  <Text code>{detalle}</Text>
+                </p>
+              )}
+              <p style={{ marginBottom: 0 }}>
+                Si el mensaje menciona una etapa del servidor, avisa al equipo técnico.
+              </p>
             </div>
           ),
           okText: "Entendido",
@@ -487,52 +513,27 @@ export default function DocumentosGrupoPage() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Número de Documento"
-                    name="numeroDocumento"
-                  >
-                    <Input placeholder="Ej. 12345678" />
+                  <Form.Item label="Fecha de Nacimiento" name="fechaNacimiento">
+                    <DatePicker
+                      style={{ width: "100%" }}
+                      format="DD/MM/YYYY"
+                      placeholder="DD/MM/AAAA"
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Tipo de Documento"
-                    name="tipoDocumento"
-                  >
-                    <Select placeholder="Selecciona tipo">
-                      <Select.Option value="dni">DNI</Select.Option>
-                      <Select.Option value="nie">NIE</Select.Option>
-                      <Select.Option value="pasaporte">Pasaporte</Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={[16, 16]}>
-                <Col xs={8}>
-                  <Form.Item
-                    label="Día"
-                    name="diaNacimiento"
-                    rules={[{ type: "number", message: "Debe ser un número válido" }]}
-                  >
-                    <InputNumber min={1} max={31} placeholder="1-31" style={{ width: "100%" }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={8}>
-                  <Form.Item
-                    label="Mes"
-                    name="mesNacimiento"
-                    rules={[{ type: "number", message: "Debe ser un número válido" }]}
-                  >
-                    <InputNumber min={1} max={12} placeholder="1-12" style={{ width: "100%" }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={8}>
-                  <Form.Item
-                    label="Año"
-                    name="anioNacimiento"
-                    rules={[{ type: "number", message: "Debe ser un número válido" }]}
-                  >
-                    <InputNumber min={1900} max={2024} placeholder="YYYY" style={{ width: "100%" }} />
+                  <Form.Item label="Documento" style={{ marginBottom: 0 }}>
+                    <Space.Compact style={{ width: "100%" }}>
+                      <Form.Item name="tipoDocumento" noStyle>
+                        <Select style={{ width: "35%" }} placeholder="Tipo">
+                          <Select.Option value="dni">DNI</Select.Option>
+                          <Select.Option value="nie">NIE</Select.Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item name="numeroDocumento" noStyle>
+                        <Input style={{ width: "65%" }} placeholder="Ej. 12345678" />
+                      </Form.Item>
+                    </Space.Compact>
                   </Form.Item>
                 </Col>
               </Row>
@@ -718,9 +719,27 @@ export default function DocumentosGrupoPage() {
           {/* Historial */}
           <Divider style={{ marginTop: "40px" }} />
 
-          <Title level={3} style={{ marginBottom: "16px", marginTop: "24px" }}>
-            Historial de Documentos
-          </Title>
+          {/* El estado cambia cuando la persona firma desde su enlace, así que
+              hace falta poder recargar sin refrescar la página entera. */}
+          <Space
+            style={{
+              width: "100%",
+              justifyContent: "space-between",
+              marginBottom: "16px",
+              marginTop: "24px",
+            }}
+          >
+            <Title level={3} style={{ margin: 0 }}>
+              Historial de Documentos
+            </Title>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={cargarDocumentos}
+              loading={documentosLoading}
+            >
+              Actualizar
+            </Button>
+          </Space>
 
           <Card>
             <Spin spinning={documentosLoading}>

@@ -5,8 +5,10 @@ import {
   Form,
   Input,
   InputNumber,
-  AutoComplete,
   Select,
+  Radio,
+  Checkbox,
+  Alert,
   Button,
   Row,
   Col,
@@ -23,7 +25,8 @@ import {
   Divider,
   Descriptions,
 } from "antd";
-import { ArrowLeftOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, CheckCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from "@ant-design/icons";
+import { PROVINCIAS, municipiosDe, codigosDe, ubicacionDe } from "@/data/codigosPostales";
 import type { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
@@ -52,6 +55,9 @@ interface FormValues {
   municipiodomtrabajador?: string;
   paisdomtrabajador?: string;
   codPostal?: string;
+  // Solo acotan los desplegables del código postal; no se envían al backend
+  cpProvincia?: string;
+  cpMunicipio?: string;
   interExterno?: "Interna" | "Externa";
   jornadaTipo?: "completo" | "parcial";
   horasJornada?: number;
@@ -59,6 +65,24 @@ interface FormValues {
   montobruto?: number;
   lugarfirma?: string;
   fechanactrabajador?: Dayjs;
+
+  // Cláusulas del documento (los huecos que van en el PDF del contrato)
+  clausulaPuesto?: string;
+  clausulaLugarTrabajo?: string;
+  clausulaDistribucion?: string;
+  clausulaPresencia?: "si" | "no";
+  clausulaPresenciaHoras?: string;
+  clausulaPresenciaReparto?: string;
+  clausulaPresenciaModo?: "compensacion" | "retribucion" | "ambas";
+  clausulaPeriodoPrueba?: string;
+  clausulaPernocta?: "si" | "no";
+  clausulaPernoctaNoches?: string;
+  clausulaPeriodicidad?: string;
+  clausulaConceptosSalariales?: string;
+  clausulaEspecie?: "si" | "no";
+  clausulaEspecieDetalle?: string;
+  clausulaVacaciones?: string;
+  clausulaBonificacion?: boolean;
 }
 
 interface ContratoRecord {
@@ -146,133 +170,19 @@ const NACIONALIDADES = [
   "Zimbabuense", "Otra",
 ];
 
-// Códigos postales de Bizkaia por municipio. Los municipios que comparten
-// código aparecen agrupados en la misma opción.
-const CODIGOS_POSTALES_VIZCAYA = [
-  { codigo: "48001", municipio: "Bilbao" },
-  { codigo: "48002", municipio: "Bilbao" },
-  { codigo: "48003", municipio: "Bilbao" },
-  { codigo: "48004", municipio: "Bilbao" },
-  { codigo: "48005", municipio: "Bilbao" },
-  { codigo: "48006", municipio: "Bilbao" },
-  { codigo: "48007", municipio: "Bilbao" },
-  { codigo: "48008", municipio: "Bilbao" },
-  { codigo: "48009", municipio: "Bilbao" },
-  { codigo: "48010", municipio: "Bilbao" },
-  { codigo: "48011", municipio: "Bilbao" },
-  { codigo: "48012", municipio: "Bilbao" },
-  { codigo: "48013", municipio: "Bilbao" },
-  { codigo: "48014", municipio: "Bilbao" },
-  { codigo: "48015", municipio: "Bilbao" },
-  { codigo: "48100", municipio: "Mungia" },
-  { codigo: "48110", municipio: "Gatika" },
-  { codigo: "48111", municipio: "Laukiz" },
-  { codigo: "48112", municipio: "Maruri-Jatabe" },
-  { codigo: "48113", municipio: "Gamiz-Fika" },
-  { codigo: "48114", municipio: "Arrieta / Zeanuri" },
-  { codigo: "48115", municipio: "Morga" },
-  { codigo: "48116", municipio: "Fruiz" },
-  { codigo: "48120", municipio: "Meñaka" },
-  { codigo: "48130", municipio: "Bakio" },
-  { codigo: "48140", municipio: "Arantzazu / Igorre" },
-  { codigo: "48141", municipio: "Dima" },
-  { codigo: "48142", municipio: "Artea" },
-  { codigo: "48143", municipio: "Areatza" },
-  { codigo: "48145", municipio: "Ubide" },
-  { codigo: "48150", municipio: "Sondika" },
-  { codigo: "48160", municipio: "Derio" },
-  { codigo: "48170", municipio: "Zamudio" },
-  { codigo: "48180", municipio: "Loiu" },
-  { codigo: "48190", municipio: "Sopuerta" },
-  { codigo: "48191", municipio: "Galdames" },
-  { codigo: "48192", municipio: "Gordexola" },
-  { codigo: "48195", municipio: "Larrabetzu" },
-  { codigo: "48196", municipio: "Lezama" },
-  { codigo: "48200", municipio: "Durango / Garai" },
-  { codigo: "48210", municipio: "Otxandio" },
-  { codigo: "48212", municipio: "Mañaria" },
-  { codigo: "48213", municipio: "Izurtza" },
-  { codigo: "48215", municipio: "Iurreta" },
-  { codigo: "48220", municipio: "Abadiño" },
-  { codigo: "48230", municipio: "Elorrio" },
-  { codigo: "48240", municipio: "Berriz" },
-  { codigo: "48250", municipio: "Zaldibar" },
-  { codigo: "48260", municipio: "Ermua" },
-  { codigo: "48269", municipio: "Mallabia" },
-  { codigo: "48270", municipio: "Markina-Xemein" },
-  { codigo: "48277", municipio: "Etxebarria" },
-  { codigo: "48278", municipio: "Ziortza-Bolibar" },
-  { codigo: "48280", municipio: "Lekeitio" },
-  { codigo: "48287", municipio: "Ea" },
-  { codigo: "48288", municipio: "Ispaster" },
-  { codigo: "48289", municipio: "Amoroto / Gizaburuaga / Mendexa" },
-  { codigo: "48291", municipio: "Atxondo" },
-  { codigo: "48300", municipio: "Gernika-Lumo" },
-  { codigo: "48309", municipio: "Errigoiti" },
-  { codigo: "48310", municipio: "Elantxobe" },
-  { codigo: "48311", municipio: "Ibarrangelu" },
-  { codigo: "48312", municipio: "Nabarniz" },
-  { codigo: "48313", municipio: "Ereño" },
-  { codigo: "48314", municipio: "Gautegiz Arteaga" },
-  { codigo: "48315", municipio: "Kortezubi" },
-  { codigo: "48320", municipio: "Ajangiz" },
-  { codigo: "48330", municipio: "Lemoa" },
-  { codigo: "48340", municipio: "Amorebieta-Etxano" },
-  { codigo: "48350", municipio: "Busturia" },
-  { codigo: "48360", municipio: "Mundaka" },
-  { codigo: "48370", municipio: "Bermeo" },
-  { codigo: "48380", municipio: "Aulesti" },
-  { codigo: "48381", municipio: "Munitibar-Arbatzegi Gerrikaitz" },
-  { codigo: "48382", municipio: "Mendata" },
-  { codigo: "48383", municipio: "Arratzu" },
-  { codigo: "48390", municipio: "Bedia" },
-  { codigo: "48392", municipio: "Muxika" },
-  { codigo: "48393", municipio: "Forua" },
-  { codigo: "48394", municipio: "Murueta" },
-  { codigo: "48395", municipio: "Sukarrieta" },
-  { codigo: "48410", municipio: "Orozko" },
-  { codigo: "48450", municipio: "Etxebarri" },
-  { codigo: "48460", municipio: "Urduña-Orduña" },
-  { codigo: "48480", municipio: "Arrigorriaga / Zaratamo" },
-  { codigo: "48490", municipio: "Ugao-Miraballes" },
-  { codigo: "48498", municipio: "Arakaldo / Arrankudiaga" },
-  { codigo: "48499", municipio: "Zeberio" },
-  { codigo: "48500", municipio: "Abanto y Ciérvana-Abanto Zierbena" },
-  { codigo: "48508", municipio: "Zierbena" },
-  { codigo: "48510", municipio: "Valle de Trápaga-Trapagaran" },
-  { codigo: "48530", municipio: "Ortuella" },
-  { codigo: "48550", municipio: "Muskiz" },
-  { codigo: "48600", municipio: "Sopelana" },
-  { codigo: "48610", municipio: "Urduliz" },
-  { codigo: "48620", municipio: "Lemoiz / Plentzia" },
-  { codigo: "48630", municipio: "Gorliz" },
-  { codigo: "48640", municipio: "Berango" },
-  { codigo: "48650", municipio: "Barrika" },
-  { codigo: "48700", municipio: "Ondarroa" },
-  { codigo: "48710", municipio: "Berriatua" },
-  { codigo: "48800", municipio: "Balmaseda" },
-  { codigo: "48810", municipio: "Alonsotegi" },
-  { codigo: "48840", municipio: "Güeñes" },
-  { codigo: "48860", municipio: "Zalla" },
-  { codigo: "48879", municipio: "Artzentales" },
-  { codigo: "48880", municipio: "Trucios-Turtzioz" },
-  { codigo: "48891", municipio: "Karrantza Harana / Valle de Carranza" },
-  { codigo: "48895", municipio: "Lanestosa" },
-  { codigo: "48901", municipio: "Barakaldo" },
-  { codigo: "48902", municipio: "Barakaldo" },
-  { codigo: "48903", municipio: "Barakaldo" },
-  { codigo: "48910", municipio: "Sestao" },
-  { codigo: "48920", municipio: "Portugalete" },
-  { codigo: "48930", municipio: "Getxo" },
-  { codigo: "48940", municipio: "Leioa" },
-  { codigo: "48950", municipio: "Erandio" },
-  { codigo: "48960", municipio: "Galdakao" },
-  { codigo: "48970", municipio: "Basauri" },
-  { codigo: "48980", municipio: "Santurtzi" },
-  { codigo: "48991", municipio: "Getxo" },
-  { codigo: "48992", municipio: "Getxo" },
-  { codigo: "48993", municipio: "Getxo" },
-];
+/**
+ * Valores de partida de las cláusulas: son los que se repiten en casi todos los
+ * contratos, pero se dejan editables porque no siempre aplican. Lo que no lleva
+ * valor por defecto se rellena a mano en cada contrato.
+ */
+const CLAUSULAS_POR_DEFECTO = {
+  clausulaPuesto: "Asistente Personal",
+  clausulaPeriodoPrueba: "2 meses",
+  clausulaPeriodicidad: "mensual",
+  clausulaConceptosSalariales: "pagas prorrateadas",
+  clausulaVacaciones: "30 días naturales",
+  clausulaBonificacion: true,
+};
 
 export default function ContratoPage() {
   const [form] = Form.useForm();
@@ -280,6 +190,27 @@ export default function ContratoPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [contratos, setContratos] = useState<ContratoRecord[]>([]);
   const [contratosLoading, setContratosLoading] = useState(false);
+  // Provincia y municipio elegidos para el código postal. Solo sirven para ir
+  // acotando los desplegables: al backend se le sigue mandando el código.
+  const [provinciaCp, setProvinciaCp] = useState<string | undefined>();
+  const [municipioCp, setMunicipioCp] = useState<string | undefined>();
+
+  /**
+   * Deja provincia y municipio en consonancia con un código postal que llega
+   * ya puesto (prellenado de CloudNavis), para que los desplegables no salgan
+   * vacíos con un código escrito debajo.
+   */
+  const sincronizarCodigoPostal = (codPostal?: string) => {
+    const ubicacion = ubicacionDe(codPostal);
+    if (!ubicacion) return;
+
+    setProvinciaCp(ubicacion.provincia);
+    setMunicipioCp(ubicacion.municipio);
+    form.setFieldsValue({
+      cpProvincia: ubicacion.provincia,
+      cpMunicipio: ubicacion.municipio,
+    });
+  };
   const router = useRouter();
 
 
@@ -287,8 +218,10 @@ export default function ContratoPage() {
     setContratosLoading(true);
     try {
       const token = obtenerToken();
+      // Sin limit el backend devuelve solo 10 registros y el historial parece
+      // incompleto; la tabla pagina por su cuenta sobre lo que llegue.
       const response = await fetch(
-        `${API_URL}/contrato/lista`,
+        `${API_URL}/contrato/lista?limit=200`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -296,16 +229,33 @@ export default function ContratoPage() {
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        setContratos(data.data || []);
+      if (!response.ok) {
+        // Sin este aviso la tabla se queda vacía sin explicar por qué (p. ej.
+        // con la sesión caducada el backend responde 403).
+        throw new Error(
+          response.status === 401 || response.status === 403
+            ? "Tu sesión ha caducado. Vuelve a iniciar sesión."
+            : `El servidor respondió ${response.status}`
+        );
       }
+
+      const data = await response.json();
+      setContratos(data.data || []);
     } catch (error) {
       console.error("Error cargando contratos:", error);
+      message.error(`No se pudo cargar el historial: ${(error as Error).message}`);
     } finally {
       setContratosLoading(false);
     }
   };
+
+  // El historial se carga siempre al abrir la página. Antes solo se pedía
+  // dentro del efecto de prellenado de CloudNavis, que corta antes si no vienen
+  // los parámetros en la URL, así que entrando de forma normal nunca aparecía.
+  useEffect(() => {
+    cargarContratos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -331,6 +281,7 @@ export default function ContratoPage() {
         const mappedEmpleador = mapEmpleadorToContrato(empleador);
 
         form.setFieldsValue({ ...mappedEmpleado, ...mappedEmpleador });
+        sincronizarCodigoPostal(form.getFieldValue("codPostal"));
 
         // Cargar historial de contratos del empleado
         cargarContratos();
@@ -521,6 +472,24 @@ export default function ContratoPage() {
         mesfirma,
         diafirma,
         anofirma,
+
+        // Cláusulas del documento
+        clausulaPuesto: values.clausulaPuesto || "",
+        clausulaLugarTrabajo: values.clausulaLugarTrabajo || "",
+        clausulaDistribucion: values.clausulaDistribucion || "",
+        clausulaPresencia: values.clausulaPresencia || "",
+        clausulaPresenciaHoras: values.clausulaPresenciaHoras || "",
+        clausulaPresenciaReparto: values.clausulaPresenciaReparto || "",
+        clausulaPresenciaModo: values.clausulaPresenciaModo || "",
+        clausulaPeriodoPrueba: values.clausulaPeriodoPrueba || "",
+        clausulaPernocta: values.clausulaPernocta || "",
+        clausulaPernoctaNoches: values.clausulaPernoctaNoches || "",
+        clausulaPeriodicidad: values.clausulaPeriodicidad || "",
+        clausulaConceptosSalariales: values.clausulaConceptosSalariales || "",
+        clausulaEspecie: values.clausulaEspecie || "",
+        clausulaEspecieDetalle: values.clausulaEspecieDetalle || "",
+        clausulaVacaciones: values.clausulaVacaciones || "",
+        clausulaBonificacion: !!values.clausulaBonificacion,
       };
 
       const token = obtenerToken();
@@ -600,6 +569,8 @@ export default function ContratoPage() {
             okText: "Cerrar",
             onOk: () => {
               form.resetFields();
+              setProvinciaCp(undefined);
+              setMunicipioCp(undefined);
               cargarContratos();
             },
           });
@@ -682,6 +653,7 @@ export default function ContratoPage() {
             layout="vertical"
             onFinish={onFinish}
             autoComplete="off"
+            initialValues={CLAUSULAS_POR_DEFECTO}
           >
             {/* Sección: Datos de Empleador */}
             <Card title="Datos de Empleador o Empleadora" style={{ marginBottom: "24px" }}>
@@ -867,20 +839,73 @@ export default function ContratoPage() {
             {/* Sección: Datos Varios */}
             <Card title="Datos del Contrato" style={{ marginBottom: "24px" }}>
               <Row gutter={[16, 16]}>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Código Postal (Bizkaia)"
-                    name="codPostal"
-                    tooltip="Puedes buscar por código o por municipio. Si necesitas uno que no esté en la lista, escríbelo directamente."
-                  >
-                    <AutoComplete
-                      placeholder="Busca por código o municipio"
-                      filterOption={(input, option) =>
-                        String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                {/* Provincia → municipio → código postal. Se eligen en cadena
+                    para no tener que buscar el código por fuera. */}
+                <Col xs={24} sm={8}>
+                  <Form.Item label="Provincia" name="cpProvincia">
+                    <Select
+                      showSearch
+                      allowClear
+                      placeholder="Selecciona la provincia"
+                      optionFilterProp="label"
+                      filterSort={undefined}
+                      options={PROVINCIAS.map((p) => ({
+                        value: p.codigo,
+                        label: p.nombre,
+                      }))}
+                      onChange={(codigo) => {
+                        // Al cambiar de provincia, lo de abajo deja de valer.
+                        setProvinciaCp(codigo);
+                        setMunicipioCp(undefined);
+                        form.setFieldsValue({ cpMunicipio: undefined, codPostal: undefined });
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label="Municipio" name="cpMunicipio">
+                    <Select
+                      showSearch
+                      allowClear
+                      disabled={!provinciaCp}
+                      placeholder={
+                        provinciaCp ? "Selecciona el municipio" : "Elige antes la provincia"
                       }
-                      options={CODIGOS_POSTALES_VIZCAYA.map((cp) => ({
-                        value: cp.codigo,
-                        label: `${cp.codigo} — ${cp.municipio}`,
+                      optionFilterProp="label"
+                      filterSort={undefined}
+                      options={municipiosDe(provinciaCp).map(([nombre]) => ({
+                        value: nombre,
+                        label: nombre,
+                      }))}
+                      onChange={(nombre) => {
+                        setMunicipioCp(nombre);
+                        // La mayoría de municipios tienen un único código, así
+                        // que se deja puesto y no hay que tocar el tercer campo.
+                        const codigos = codigosDe(provinciaCp, nombre);
+                        form.setFieldValue(
+                          "codPostal",
+                          codigos.length === 1 ? codigos[0] : undefined
+                        );
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="Código Postal"
+                    name="codPostal"
+                    tooltip="Se rellena solo al elegir el municipio. Si el municipio tiene varios códigos, elige el que corresponda."
+                  >
+                    <Select
+                      showSearch
+                      allowClear
+                      disabled={!municipioCp}
+                      placeholder={
+                        municipioCp ? "Selecciona el código" : "Elige antes el municipio"
+                      }
+                      options={codigosDe(provinciaCp, municipioCp).map((codigo) => ({
+                        value: codigo,
+                        label: codigo,
                       }))}
                     />
                   </Form.Item>
@@ -956,12 +981,228 @@ export default function ContratoPage() {
               </Row>
             </Card>
 
+            {/* Sección: Cláusulas del documento.
+                Cada campo corresponde a un hueco concreto del modelo oficial;
+                por eso la etiqueta cita la cláusula y la frase que lo rodea. */}
+            <Card title="Cláusulas del Contrato" style={{ marginBottom: "24px" }}>
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Estos campos rellenan los huecos de las cláusulas del contrato."
+                description="Los que vienen con texto son valores habituales: puedes cambiarlos. Lo que dejes vacío saldrá en blanco en el documento."
+              />
+
+              <Divider orientation="left" plain>
+                PRIMERA — Puesto y lugar de trabajo
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Prestará sus servicios como…"
+                    name="clausulaPuesto"
+                    tooltip="Categoría o puesto. Aparece en el primer hueco de la cláusula PRIMERA."
+                  >
+                    <Input placeholder="Ej. Asistente Personal" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="…en el domicilio de trabajo ubicado en (calle, nº y localidad)"
+                    name="clausulaLugarTrabajo"
+                    tooltip="Dirección donde se presta el servicio."
+                  >
+                    <Input placeholder="Ej. Calle Mayor 12, 3º B, Bilbao" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                SEGUNDA — Distribución del tiempo de trabajo
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24}>
+                  <Form.Item
+                    label="La distribución del tiempo de trabajo será de…"
+                    name="clausulaDistribucion"
+                    tooltip="Horario concreto. Es el hueco que abre la segunda página del contrato."
+                  >
+                    <Input placeholder="Ej. De lunes a viernes, de 09:00 a 13:00 horas" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                TERCERA — Horas de presencia
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="¿Se pactan horas de presencia?"
+                    name="clausulaPresencia"
+                    tooltip="Marca la casilla SI o NO de la cláusula TERCERA."
+                  >
+                    <Radio.Group>
+                      <Radio value="si">Sí</Radio>
+                      <Radio value="no">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={4}>
+                  <Form.Item label="Horas semanales de presencia" name="clausulaPresenciaHoras">
+                    <Input placeholder="Ej. 5" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="…distribuidas de la siguiente manera"
+                    name="clausulaPresenciaReparto"
+                  >
+                    <Input placeholder="Ej. Sábados por la tarde" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24}>
+                  <Form.Item
+                    label="El tiempo de presencia se retribuirá o compensará…"
+                    name="clausulaPresenciaModo"
+                    tooltip="Marca una de las tres casillas de la cláusula TERCERA."
+                  >
+                    <Radio.Group>
+                      <Space direction="vertical" size={2}>
+                        <Radio value="compensacion">
+                          Compensación con períodos equivalentes de descanso retribuido
+                        </Radio>
+                        <Radio value="retribucion">
+                          Retribución con un salario no inferior al de las horas ordinarias
+                        </Radio>
+                        <Radio value="ambas">De cualquiera de las anteriores maneras</Radio>
+                      </Space>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                CUARTA — Período de prueba
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Se establece un período de prueba de…"
+                    name="clausulaPeriodoPrueba"
+                    tooltip="La fecha de inicio de la relación laboral sale de «Fecha del Contrato»; aquí solo va la duración de la prueba."
+                  >
+                    <Input placeholder="Ej. 2 meses" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                QUINTA — Pernocta en el domicilio
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="¿Pernocta en el domicilio del empleador?"
+                    name="clausulaPernocta"
+                    tooltip="Marca la casilla SI o NO de la cláusula QUINTA."
+                  >
+                    <Radio.Group>
+                      <Radio value="si">Sí</Radio>
+                      <Radio value="no">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="El régimen de pernoctas será de… (noches a la semana)"
+                    name="clausulaPernoctaNoches"
+                  >
+                    <Input placeholder="Ej. 2" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                SEXTA — Retribución
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Periodicidad del pago"
+                    name="clausulaPeriodicidad"
+                    tooltip="Va justo detrás de «euros brutos». El importe sale de «Monto Bruto Mensual»."
+                  >
+                    <Input placeholder="Ej. mensual" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="…que se distribuirán en los siguientes conceptos salariales"
+                    name="clausulaConceptosSalariales"
+                  >
+                    <Input placeholder="Ej. pagas prorrateadas" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item
+                    label="¿Se pactan retribuciones en especie?"
+                    name="clausulaEspecie"
+                  >
+                    <Radio.Group>
+                      <Radio value="si">Sí</Radio>
+                      <Radio value="no">No</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={16}>
+                  <Form.Item
+                    label="Las retribuciones en especie consistirán en…"
+                    name="clausulaEspecieDetalle"
+                    tooltip="Solo si has marcado que sí. Se escribe en la línea que hay bajo la cláusula."
+                  >
+                    <Input placeholder="Ej. Manutención y alojamiento" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Divider orientation="left" plain>
+                SÉPTIMA y OCTAVA
+              </Divider>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="La duración de las vacaciones anuales será de…"
+                    name="clausulaVacaciones"
+                  >
+                    <Input placeholder="Ej. 30 días naturales" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Reducción del 20% en las cotizaciones (OCTAVA)"
+                    name="clausulaBonificacion"
+                    valuePropName="checked"
+                    tooltip="Marca la casilla del final del contrato."
+                  >
+                    <Checkbox>Marcar la casilla de la cláusula OCTAVA</Checkbox>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
                 <Button type="primary" htmlType="submit" loading={loading}>
                   Generar Contrato
                 </Button>
-                <Button onClick={() => form.resetFields()}>
+                <Button
+                  onClick={() => {
+                    form.resetFields();
+                    setProvinciaCp(undefined);
+                    setMunicipioCp(undefined);
+                  }}
+                >
                   Limpiar
                 </Button>
               </Space>
@@ -971,9 +1212,27 @@ export default function ContratoPage() {
           {/* Tabla de Contratos */}
           <Divider style={{ marginTop: "40px" }} />
 
-          <Title level={3} style={{ marginBottom: "16px", marginTop: "24px" }}>
-            Historial de Contratos
-          </Title>
+          {/* El estado cambia cuando la persona firma desde su enlace, así que
+              hace falta poder recargar sin refrescar la página entera. */}
+          <Space
+            style={{
+              width: "100%",
+              justifyContent: "space-between",
+              marginBottom: "16px",
+              marginTop: "24px",
+            }}
+          >
+            <Title level={3} style={{ margin: 0 }}>
+              Historial de Contratos
+            </Title>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={cargarContratos}
+              loading={contratosLoading}
+            >
+              Actualizar
+            </Button>
+          </Space>
 
           <Card>
             <Spin spinning={contratosLoading}>
