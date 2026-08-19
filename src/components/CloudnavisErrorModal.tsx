@@ -53,7 +53,7 @@ const CloudnavisErrorModal: React.FC<CloudnavisErrorModalProps> = ({
           <span>{errorInfo.title}</span>
         </div>
       }
-      visible={visible}
+      open={visible}
       onCancel={onContinue}
       closable={false}
       footer={
