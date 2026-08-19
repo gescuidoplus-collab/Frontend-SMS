@@ -29,6 +29,7 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   CalculatorOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
@@ -67,6 +68,10 @@ interface FormValues {
 interface Calculado {
   diasTrabajados: number;
   diasPeriodo: number;
+  // Precio del día con el que se paga el último período y findes del mes de la
+  // baja (0 si la jornada no es de fin de semana)
+  salarioDiarioPeriodo: number;
+  diasFindeDelMes: number;
   // Vacaciones: se computan solo dentro del año en curso
   diasComputoVacaciones: number;
   diasVacacionesGenerados: number;
@@ -168,6 +173,12 @@ const contarDiasFinde = (inicio: Dayjs, fin: Dayjs): number => {
   return dias;
 };
 
+// Sábados y domingos que tiene el mes completo al que pertenece la fecha.
+const contarDiasFindeDelMes = (fecha: Dayjs): number => {
+  const inicioMes = fecha.startOf("month");
+  return contarDiasFinde(inicioMes, inicioMes.add(1, "month"));
+};
+
 /**
  * El último período salarial es el del mes en curso: los meses anteriores ya
  * se pagaron en su nómina. Arranca el día 1 del mes de la baja, salvo que el
@@ -240,7 +251,18 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
     tipoJornada === "finde"
       ? contarDiasFinde(inicioPeriodo, fechasalariofinalconanio)
       : fechasalariofinalconanio.diff(inicioPeriodo, "day");
-  const importeSalario = Math.max(0, diasPeriodo * salarioDiarioNeto);
+
+  // Quien solo trabaja fines de semana cobra el mes entero en esos días, así
+  // que el precio del día sale de repartir el salario entre los findes de ese
+  // mes, no entre 30: si no, se le pagaría una fracción de lo que le toca.
+  const diasFindeDelMes =
+    tipoJornada === "finde" ? contarDiasFindeDelMes(fechasalariofinalconanio) : 0;
+  const salarioDiarioPeriodo =
+    tipoJornada === "finde" && diasFindeDelMes > 0
+      ? salarioNeto / diasFindeDelMes
+      : salarioDiarioNeto;
+
+  const importeSalario = Math.max(0, diasPeriodo * salarioDiarioPeriodo);
 
   // Durante el período de prueba solo se abonan los días trabajados: no hay
   // vacaciones, ni preaviso, ni indemnización.
@@ -248,6 +270,8 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
     return {
       diasTrabajados,
       diasPeriodo,
+      salarioDiarioPeriodo,
+      diasFindeDelMes,
       diasComputoVacaciones: 0,
       diasVacacionesGenerados: 0,
       diasVacacionesAPagar: 0,
@@ -309,6 +333,8 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
   return {
     diasTrabajados,
     diasPeriodo,
+    salarioDiarioPeriodo,
+    diasFindeDelMes,
     diasComputoVacaciones,
     diasVacacionesGenerados,
     diasVacacionesAPagar,
@@ -368,8 +394,10 @@ export default function FiniquitoPage() {
     setFiniquitosLoading(true);
     try {
       const token = obtenerToken();
+      // Sin limit el backend devuelve solo 10 registros y el historial parece
+      // incompleto; la tabla pagina por su cuenta sobre lo que llegue.
       const response = await fetch(
-        `${API_URL}/finiquito/lista`,
+        `${API_URL}/finiquito/lista?limit=200`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -377,12 +405,21 @@ export default function FiniquitoPage() {
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        setFiniquitos(data.data || []);
+      if (!response.ok) {
+        // Sin este aviso la tabla se queda vacía sin explicar por qué (p. ej.
+        // con la sesión caducada el backend responde 403).
+        throw new Error(
+          response.status === 401 || response.status === 403
+            ? "Tu sesión ha caducado. Vuelve a iniciar sesión."
+            : `El servidor respondió ${response.status}`
+        );
       }
+
+      const data = await response.json();
+      setFiniquitos(data.data || []);
     } catch (error) {
       console.error("Error cargando finiquitos:", error);
+      message.error(`No se pudo cargar el historial: ${(error as Error).message}`);
     } finally {
       setFiniquitosLoading(false);
     }
@@ -1274,7 +1311,18 @@ export default function FiniquitoPage() {
                         calculado.diasPeriodo === 1 ? "día" : "días"
                       })`}
                     >
-                      <strong>{fmt(calculado.importeSalario)} €</strong>
+                      <Space direction="vertical" size={0}>
+                        <strong>{fmt(calculado.importeSalario)} €</strong>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {calculado.diasFindeDelMes > 0
+                            ? `${fmt(calculado.salarioDiarioPeriodo)} €/día (salario ÷ ${
+                                calculado.diasFindeDelMes
+                              } días de finde del mes) × ${calculado.diasPeriodo} pendientes`
+                            : `${fmt(calculado.salarioDiarioPeriodo)} €/día (salario ÷ 30) × ${
+                                calculado.diasPeriodo
+                              } días`}
+                        </Text>
+                      </Space>
                     </Descriptions.Item>
                     <Descriptions.Item
                       label={
@@ -1396,9 +1444,27 @@ export default function FiniquitoPage() {
           {/* Tabla de Finiquitos */}
           <Divider style={{ marginTop: "40px" }} />
 
-          <Title level={3} style={{ marginBottom: "16px", marginTop: "24px" }}>
-            Historial de Finiquitos
-          </Title>
+          {/* El estado cambia cuando la persona firma desde su enlace, así que
+              hace falta poder recargar sin refrescar la página entera. */}
+          <Space
+            style={{
+              width: "100%",
+              justifyContent: "space-between",
+              marginBottom: "16px",
+              marginTop: "24px",
+            }}
+          >
+            <Title level={3} style={{ margin: 0 }}>
+              Historial de Finiquitos
+            </Title>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={cargarFiniquitos}
+              loading={finiquitosLoading}
+            >
+              Actualizar
+            </Button>
+          </Space>
 
           <Card>
             <Spin spinning={finiquitosLoading}>
