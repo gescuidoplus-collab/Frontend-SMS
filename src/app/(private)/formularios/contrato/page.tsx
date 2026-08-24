@@ -117,16 +117,36 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
   return `${dia} de ${mes} ${anio}`;
 };
 
-// Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito control(1) + Contr(1) = 12 dígitos
+/**
+ * Reparte la cuenta de cotización entre las casillas del contrato:
+ * Régimen(4) + Cód.(1) + Prov.(1) + Número(variable) + Díg.(1) + Contr.(1).
+ *
+ * El número no tiene una longitud fija, así que se toma lo que queda entre la
+ * provincia y los dos últimos dígitos, que siempre son el dígito de control y
+ * el de control de cuenta. La cuadrícula del PDF admite hasta 9 en el número,
+ * de ahí el máximo de 17 dígitos en total.
+ */
+const CUENTA_COTIZACION_MAX = 17;
+
 const splitCuentaCotizacion = (value?: string) => {
-  const digits = (value || "").replace(/\D/g, "").slice(0, 12);
-  return {
+  const digits = (value || "").replace(/\D/g, "").slice(0, CUENTA_COTIZACION_MAX);
+  const cabecera = {
     regimen: digits.slice(0, 4),
     codigo: digits.slice(4, 5),
     prov: digits.slice(5, 6),
-    numero: digits.slice(6, 10),
-    dig: digits.slice(10, 11),
-    contr: digits.slice(11, 12),
+  };
+
+  // Con menos de 9 dígitos (4+1+1+1+1+1) todavía no hay número ni dígitos de
+  // control que separar: se muestra lo que haya y el resto queda vacío.
+  if (digits.length < 9) {
+    return { ...cabecera, numero: digits.slice(6), dig: "", contr: "" };
+  }
+
+  return {
+    ...cabecera,
+    numero: digits.slice(6, -2),
+    dig: digits.slice(-2, -1),
+    contr: digits.slice(-1),
   };
 };
 
@@ -713,16 +733,24 @@ export default function ContratoPage() {
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Cuenta de Cotización (12 dígitos) — No requerido"
+                    label="Cuenta de Cotización — No requerido"
                     name="cuentaCotizacion"
-                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito de control(1) + Contr(1) = 12 dígitos. Se separan automáticamente. Si se deja vacío, esos huecos salen en blanco en el contrato."
+                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número + Dígito de control(1) + Contr(1). El número no tiene longitud fija: se reparte solo, tomando los dos últimos dígitos como los de control. Si se deja vacío, esos huecos salen en blanco en el contrato."
                     // Deja de ser obligatoria: hay contratos que se preparan
-                    // antes de tener el número de cuenta de cotización.
+                    // antes de tener el número de cuenta de cotización. Solo se
+                    // acota el máximo, porque a partir de ahí el PDF no tiene
+                    // casillas y descartaría los dígitos sin avisar.
                     rules={[
-                      { pattern: /^\d{12}$/, message: "Debe tener exactamente 12 dígitos" },
+                      {
+                        pattern: new RegExp(`^\\d{9,${CUENTA_COTIZACION_MAX}}$`),
+                        message: `Solo dígitos, entre 9 y ${CUENTA_COTIZACION_MAX}`,
+                      },
                     ]}
                   >
-                    <Input placeholder="Ej. 013801234567" maxLength={12} />
+                    <Input
+                      placeholder="Ej. 0138011234567"
+                      maxLength={CUENTA_COTIZACION_MAX}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
