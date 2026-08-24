@@ -58,7 +58,11 @@ interface FormValues {
   // Solo acotan los desplegables del código postal; no se envían al backend
   cpProvincia?: string;
   cpMunicipio?: string;
-  interExterno?: "Interna" | "Externa";
+  interExterno?:
+    | "Interna"
+    | "Externa"
+    | "Interna fin de semana"
+    | "Externa fin de semana";
   jornadaTipo?: "completo" | "parcial";
   horasJornada?: number;
   fechacontrato?: Dayjs;
@@ -697,11 +701,12 @@ export default function ContratoPage() {
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Cuenta de Cotización (12 dígitos)"
+                    label="Cuenta de Cotización (12 dígitos) — No requerido"
                     name="cuentaCotizacion"
-                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito de control(1) + Contr(1) = 12 dígitos. Se separan automáticamente."
+                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito de control(1) + Contr(1) = 12 dígitos. Se separan automáticamente. Si se deja vacío, esos huecos salen en blanco en el contrato."
+                    // Deja de ser obligatoria: hay contratos que se preparan
+                    // antes de tener el número de cuenta de cotización.
                     rules={[
-                      { required: true, message: "Requerido" },
                       { pattern: /^\d{12}$/, message: "Debe tener exactamente 12 dígitos" },
                     ]}
                   >
@@ -918,6 +923,12 @@ export default function ContratoPage() {
                     <Select placeholder="Selecciona una opción">
                       <Select.Option value="Interna">Interna</Select.Option>
                       <Select.Option value="Externa">Externa</Select.Option>
+                      <Select.Option value="Interna fin de semana">
+                        Interna fin de semana
+                      </Select.Option>
+                      <Select.Option value="Externa fin de semana">
+                        Externa fin de semana
+                      </Select.Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -1182,7 +1193,6 @@ export default function ContratoPage() {
                   <Form.Item
                     label="Reducción del 20% en las cotizaciones (OCTAVA)"
                     name="clausulaBonificacion"
-                    valuePropName="checked"
                     tooltip="Marca la casilla del final del contrato."
                   >
                     <Checkbox>Marcar la casilla de la cláusula OCTAVA</Checkbox>
