@@ -58,7 +58,11 @@ interface FormValues {
   // Solo acotan los desplegables del código postal; no se envían al backend
   cpProvincia?: string;
   cpMunicipio?: string;
-  interExterno?: "Interna" | "Externa";
+  interExterno?:
+    | "Interna"
+    | "Externa"
+    | "Interna fin de semana"
+    | "Externa fin de semana";
   jornadaTipo?: "completo" | "parcial";
   horasJornada?: number;
   fechacontrato?: Dayjs;
@@ -100,25 +104,49 @@ interface ContratoRecord {
   lastError?: { stage?: string; message?: string };
 }
 
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
   if (!date) return "";
-  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const dia = date.date();
-  const mes = meses[date.month()];
+  const mes = MESES[date.month()];
   const anio = date.year();
   return `${dia} de ${mes} ${anio}`;
 };
 
-// Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito control(1) + Contr(1) = 12 dígitos
+/**
+ * Reparte la cuenta de cotización entre las casillas del contrato:
+ * Régimen(4) + Cód.(1) + Prov.(1) + Número(variable) + Díg.(1) + Contr.(1).
+ *
+ * El número no tiene una longitud fija, así que se toma lo que queda entre la
+ * provincia y los dos últimos dígitos, que siempre son el dígito de control y
+ * el de control de cuenta. La cuadrícula del PDF admite hasta 9 en el número,
+ * de ahí el máximo de 17 dígitos en total.
+ */
+const CUENTA_COTIZACION_MAX = 17;
+
 const splitCuentaCotizacion = (value?: string) => {
-  const digits = (value || "").replace(/\D/g, "").slice(0, 12);
-  return {
+  const digits = (value || "").replace(/\D/g, "").slice(0, CUENTA_COTIZACION_MAX);
+  const cabecera = {
     regimen: digits.slice(0, 4),
     codigo: digits.slice(4, 5),
     prov: digits.slice(5, 6),
-    numero: digits.slice(6, 10),
-    dig: digits.slice(10, 11),
-    contr: digits.slice(11, 12),
+  };
+
+  // Con menos de 9 dígitos (4+1+1+1+1+1) todavía no hay número ni dígitos de
+  // control que separar: se muestra lo que haya y el resto queda vacío.
+  if (digits.length < 9) {
+    return { ...cabecera, numero: digits.slice(6), dig: "", contr: "" };
+  }
+
+  return {
+    ...cabecera,
+    numero: digits.slice(6, -2),
+    dig: digits.slice(-2, -1),
+    contr: digits.slice(-1),
   };
 };
 
@@ -210,6 +238,12 @@ export default function ContratoPage() {
       cpProvincia: ubicacion.provincia,
       cpMunicipio: ubicacion.municipio,
     });
+
+    // Solo si viene vacío: aquí el municipio se deduce de un dato ya existente,
+    // así que no debe pisar un lugar de firma que ya se hubiera indicado.
+    if (!form.getFieldValue("lugarfirma")) {
+      form.setFieldValue("lugarfirma", ubicacion.municipio);
+    }
   };
   const router = useRouter();
 
@@ -438,7 +472,9 @@ export default function ContratoPage() {
     try {
       const cuenta = splitCuentaCotizacion(values.cuentaCotizacion);
       const diafirma = values.fechacontrato ? String(values.fechacontrato.date()).padStart(2, "0") : "";
-      const mesfirma = values.fechacontrato ? String(values.fechacontrato.month() + 1).padStart(2, "0") : "";
+      // En la línea de firma el mes va con su nombre ("de Agosto de"), no como
+      // número: el hueco del PDF tiene 141 pt y cabe de sobra.
+      const mesfirma = values.fechacontrato ? MESES[values.fechacontrato.month()] : "";
       const anofirma = values.fechacontrato ? String(values.fechacontrato.year()).slice(-2) : "";
 
       const payload = {
@@ -697,15 +733,24 @@ export default function ContratoPage() {
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Cuenta de Cotización (12 dígitos)"
+                    label="Cuenta de Cotización — No requerido"
                     name="cuentaCotizacion"
-                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número(4) + Dígito de control(1) + Contr(1) = 12 dígitos. Se separan automáticamente."
+                    tooltip="Régimen(4) + Código(1) + Provincia(1) + Número + Dígito de control(1) + Contr(1). El número no tiene longitud fija: se reparte solo, tomando los dos últimos dígitos como los de control. Si se deja vacío, esos huecos salen en blanco en el contrato."
+                    // Deja de ser obligatoria: hay contratos que se preparan
+                    // antes de tener el número de cuenta de cotización. Solo se
+                    // acota el máximo, porque a partir de ahí el PDF no tiene
+                    // casillas y descartaría los dígitos sin avisar.
                     rules={[
-                      { required: true, message: "Requerido" },
-                      { pattern: /^\d{12}$/, message: "Debe tener exactamente 12 dígitos" },
+                      {
+                        pattern: new RegExp(`^\\d{9,${CUENTA_COTIZACION_MAX}}$`),
+                        message: `Solo dígitos, entre 9 y ${CUENTA_COTIZACION_MAX}`,
+                      },
                     ]}
                   >
-                    <Input placeholder="Ej. 013801234567" maxLength={12} />
+                    <Input
+                      placeholder="Ej. 0138011234567"
+                      maxLength={CUENTA_COTIZACION_MAX}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -886,6 +931,10 @@ export default function ContratoPage() {
                           "codPostal",
                           codigos.length === 1 ? codigos[0] : undefined
                         );
+                        // El municipio es también el lugar de firma ("En ...");
+                        // se deja escrito para no tener que teclearlo otra vez,
+                        // y se puede cambiar si la firma es en otro sitio.
+                        if (nombre) form.setFieldValue("lugarfirma", nombre);
                       }}
                     />
                   </Form.Item>
@@ -918,6 +967,12 @@ export default function ContratoPage() {
                     <Select placeholder="Selecciona una opción">
                       <Select.Option value="Interna">Interna</Select.Option>
                       <Select.Option value="Externa">Externa</Select.Option>
+                      <Select.Option value="Interna fin de semana">
+                        Interna fin de semana
+                      </Select.Option>
+                      <Select.Option value="Externa fin de semana">
+                        Externa fin de semana
+                      </Select.Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -947,8 +1002,9 @@ export default function ContratoPage() {
                   <Form.Item
                     label="Lugar de Firma"
                     name="lugarfirma"
+                    tooltip="Es el «En …» de la línea de firma. Se rellena con el municipio que elijas arriba; cámbialo solo si se firma en otro sitio."
                   >
-                    <Input placeholder="Ej. Madrid" />
+                    <Input placeholder="Se rellena con el municipio" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -1182,7 +1238,6 @@ export default function ContratoPage() {
                   <Form.Item
                     label="Reducción del 20% en las cotizaciones (OCTAVA)"
                     name="clausulaBonificacion"
-                    valuePropName="checked"
                     tooltip="Marca la casilla del final del contrato."
                   >
                     <Checkbox>Marcar la casilla de la cláusula OCTAVA</Checkbox>
