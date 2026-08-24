@@ -104,11 +104,15 @@ interface ContratoRecord {
   lastError?: { stage?: string; message?: string };
 }
 
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
   if (!date) return "";
-  const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const dia = date.date();
-  const mes = meses[date.month()];
+  const mes = MESES[date.month()];
   const anio = date.year();
   return `${dia} de ${mes} ${anio}`;
 };
@@ -214,6 +218,12 @@ export default function ContratoPage() {
       cpProvincia: ubicacion.provincia,
       cpMunicipio: ubicacion.municipio,
     });
+
+    // Solo si viene vacío: aquí el municipio se deduce de un dato ya existente,
+    // así que no debe pisar un lugar de firma que ya se hubiera indicado.
+    if (!form.getFieldValue("lugarfirma")) {
+      form.setFieldValue("lugarfirma", ubicacion.municipio);
+    }
   };
   const router = useRouter();
 
@@ -442,7 +452,9 @@ export default function ContratoPage() {
     try {
       const cuenta = splitCuentaCotizacion(values.cuentaCotizacion);
       const diafirma = values.fechacontrato ? String(values.fechacontrato.date()).padStart(2, "0") : "";
-      const mesfirma = values.fechacontrato ? String(values.fechacontrato.month() + 1).padStart(2, "0") : "";
+      // En la línea de firma el mes va con su nombre ("de Agosto de"), no como
+      // número: el hueco del PDF tiene 141 pt y cabe de sobra.
+      const mesfirma = values.fechacontrato ? MESES[values.fechacontrato.month()] : "";
       const anofirma = values.fechacontrato ? String(values.fechacontrato.year()).slice(-2) : "";
 
       const payload = {
@@ -891,6 +903,10 @@ export default function ContratoPage() {
                           "codPostal",
                           codigos.length === 1 ? codigos[0] : undefined
                         );
+                        // El municipio es también el lugar de firma ("En ...");
+                        // se deja escrito para no tener que teclearlo otra vez,
+                        // y se puede cambiar si la firma es en otro sitio.
+                        if (nombre) form.setFieldValue("lugarfirma", nombre);
                       }}
                     />
                   </Form.Item>
@@ -958,8 +974,9 @@ export default function ContratoPage() {
                   <Form.Item
                     label="Lugar de Firma"
                     name="lugarfirma"
+                    tooltip="Es el «En …» de la línea de firma. Se rellena con el municipio que elijas arriba; cámbialo solo si se firma en otro sitio."
                   >
-                    <Input placeholder="Ej. Madrid" />
+                    <Input placeholder="Se rellena con el municipio" />
                   </Form.Item>
                 </Col>
               </Row>
