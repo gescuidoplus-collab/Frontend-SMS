@@ -61,8 +61,6 @@ const DashboardPage = () => {
   const [presupuestos, setPresupuestos] = useState<PresupuestoType[]>([]);
   // Definir tipo para desgloses - sólo valores string para los inputs
   const [desgloses, setDesgloses] = useState<Record<number, string>>({});
-  const [mensajesPresupuesto, setMensajesPresupuestos] = useState<Record<number, string>>({});
-  const [mensajesActivacion, setMensajesActivacion] = useState<Record<number, string>>({});
 
   //VARIABLES INPUT
   const [precioHora, setPrecioHora] = useState(8.3);
@@ -558,9 +556,8 @@ const DashboardPage = () => {
                       presupuestos: presupuestos.map((p, index) => ({
                         numero: index + 1,
                         resultados: p.resultados,
+                        // El mismo texto encabeza el desglose y el coste total
                         desglose: desgloses[p.id] || "",
-                        mensajesPresupuesto: mensajesPresupuesto[p.id] || "",
-                        mensajesActivacion: mensajesActivacion[p.id] || "",
                       })),
                     };
                     console.log("✓ Formulario validado:", payload);
@@ -793,6 +790,11 @@ const DashboardPage = () => {
                 {presupuestos.map((p, index) => (
                   <div key={p.id}>
                     <Text>Desglose del Presupuesto {index + 1}</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Encabeza tanto «Desglose del Presupuesto» como «Coste Total y
+                      Activación» de este presupuesto.
+                    </Text>
                     <Input
                       style={{ marginTop: 8 }}
                       placeholder={`Describe el presupuesto ${index + 1}`}
@@ -805,30 +807,6 @@ const DashboardPage = () => {
                       }
                     />
 
-                    <Text>Complemento Desgloce Presupuesto {index + 1}</Text>
-                    <Input
-                      style={{ marginTop: 8 }}
-                      placeholder={`Describe el Complemento del presupuesto ${index + 1}`}
-                      value={mensajesPresupuesto[p.id] || ""}
-                      onChange={(e) =>
-                        setMensajesPresupuestos({
-                          ...mensajesPresupuesto,
-                          [p.id]: e.target.value,
-                        })
-                      } 
-                    />
-                    <Text>Complemento Activacion Presupuesto {index + 1}</Text>
-                    <Input
-                      style={{ marginTop: 8 }}
-                      placeholder={`Describe el complemento de la  Activacion ${index + 1}`}
-                      value={mensajesActivacion[p.id] || ""}
-                      onChange={(e) =>
-                        setMensajesActivacion({
-                          ...mensajesActivacion,
-                          [p.id]: e.target.value,
-                        })
-                      }
-                      />
                   <Divider></Divider>
                   </div>
                 ))}
