@@ -488,7 +488,13 @@ export default function FiniquitoPage() {
     const idCliente = params.get("idCliente");
     const token = params.get("token");
 
+    // Sin parametros se entra a rellenar a mano, que es lo normal.
+    if (!idEmpleado && !idCliente && !token) return;
+
+    // Pero si el enlace trae algo y le falta lo esencial, hay que decirlo:
+    // antes se salia en silencio y el formulario aparecia vacio sin motivo.
     if (!idEmpleado || !idCliente || !token) {
+      setErrorCode("ENLACE_INCOMPLETO");
       return;
     }
 

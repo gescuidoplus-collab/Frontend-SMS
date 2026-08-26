@@ -98,7 +98,13 @@ export default function DocumentosGrupoPage() {
     const idEmpleado = params.get("idEmpleado");
     const token = params.get("token");
 
+    // Sin parametros se entra a rellenar a mano, que es lo normal.
+    if (!idEmpleado && !token) return;
+
+    // Pero si el enlace trae algo y le falta lo esencial, hay que decirlo:
+    // antes se salia en silencio y el formulario aparecia vacio sin motivo.
     if (!idEmpleado || !token) {
+      setErrorCode("ENLACE_INCOMPLETO");
       return;
     }
 

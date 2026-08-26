@@ -35,6 +35,13 @@ const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     title: 'Error procesando datos',
     message: 'Hubo un problema al procesar los datos. Contacta con soporte.',
   },
+  // Antes, un enlace al que le faltaba algun parametro simplemente no hacia
+  // nada: el formulario salia vacio sin explicar por que.
+  ENLACE_INCOMPLETO: {
+    title: 'El enlace está incompleto',
+    message:
+      'Falta el identificador del empleado (idEmpleado) en el enlace, así que no se han podido traer los datos de CloudNavis. Puedes rellenar el formulario a mano o pedir un enlace nuevo.',
+  },
 };
 
 const CloudnavisErrorModal: React.FC<CloudnavisErrorModalProps> = ({
