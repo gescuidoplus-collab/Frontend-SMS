@@ -36,7 +36,10 @@ export function middleware(request: NextRequest) {
     if (esEnlaceDeCloudnavis(request)) {
       return NextResponse.next();
     }
+    // `new URL("/login", ...)` se deja fuera el query string, así que la ruta
+    // original se guarda aparte para volver a ella después de entrar.
     const url = new URL("/login", request.url);
+    url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 

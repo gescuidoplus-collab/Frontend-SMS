@@ -11,6 +11,24 @@ interface LoginFormValues {
   password: string;
 }
 
+/**
+ * A dónde ir después de entrar.
+ *
+ * Si se llegó aquí desde una página protegida, `next` trae la ruta original
+ * (con su query string) para no perderla; es lo que salva los enlaces de
+ * CloudNavis. Solo se aceptan rutas propias que empiecen por una sola barra:
+ * cualquier otra cosa sería una redirección abierta a un sitio ajeno.
+ */
+const destinoTrasLogin = (): string => {
+  if (typeof window === "undefined") return "/dashboard";
+
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    return next;
+  }
+  return "/dashboard";
+};
+
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +45,7 @@ const LoginPage = () => {
       guardarSesion(token);
       // Recarga completa en vez de router.push: así el middleware ve la cookie
       // recién puesta y no rebota la navegación.
-      window.location.href = "/dashboard";
+      window.location.href = destinoTrasLogin();
     } catch (error) {
       console.error("Login failed:", error);
       message.error("No se pudo iniciar sesión. Revisa el correo y la contraseña.");
