@@ -46,6 +46,8 @@ import {
   mapServicioToFiniquito,
 } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import LoginRequeridoModal from "@/components/LoginRequeridoModal";
+import { useSesionEnlace } from "@/lib/useSesionEnlace";
 import { obtenerToken } from "@/lib/session";
 import { API_URL } from "@/lib/config";
 
@@ -370,6 +372,9 @@ export default function FiniquitoPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [finiquitos, setFiniquitos] = useState<FiniquitoRecord[]>([]);
   const [finiquitosLoading, setFiniquitosLoading] = useState(false);
+  // Un enlace de CloudNavis puede abrirse sin sesión: el prellenado funciona
+  // igual (usa el token de la URL), pero el historial y el envío no.
+  const { haySesion, marcarSesionIniciada } = useSesionEnlace();
   const [textoPorDefecto, setTextoPorDefecto] = useState("");
   const router = useRouter();
 
@@ -400,9 +405,13 @@ export default function FiniquitoPage() {
 
 
   const cargarFiniquitos = async () => {
+    const token = obtenerToken();
+    // Un enlace de CloudNavis puede abrirse sin sesión: en ese caso el modal de
+    // login ya lo está pidiendo y no tiene sentido llamar ni avisar de nada.
+    if (!token) return;
+
     setFiniquitosLoading(true);
     try {
-      const token = obtenerToken();
       // Sin limit el backend devuelve solo 10 registros y el historial parece
       // incompleto; la tabla pagina por su cuenta sobre lo que llegue.
       const response = await fetch(
@@ -971,6 +980,14 @@ export default function FiniquitoPage() {
         errorCode={errorCode || ""}
         onRetry={handleRetryFetch}
         onContinue={() => setErrorCode(null)}
+      />
+      <LoginRequeridoModal
+        abierto={!haySesion}
+        onSesionIniciada={() => {
+          marcarSesionIniciada();
+          // El historial no se pudo cargar sin sesión; ahora sí.
+          cargarFiniquitos();
+        }}
       />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>

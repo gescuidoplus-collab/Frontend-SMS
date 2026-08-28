@@ -42,6 +42,8 @@ import {
   mapServicioToContrato,
 } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import LoginRequeridoModal from "@/components/LoginRequeridoModal";
+import { useSesionEnlace } from "@/lib/useSesionEnlace";
 import { obtenerToken } from "@/lib/session";
 import { API_URL } from "@/lib/config";
 
@@ -231,6 +233,9 @@ export default function ContratoPage() {
   // acotando los desplegables: al backend se le sigue mandando el código.
   const [provinciaCp, setProvinciaCp] = useState<string | undefined>();
   const [municipioCp, setMunicipioCp] = useState<string | undefined>();
+  // Un enlace de CloudNavis puede abrirse sin sesión: el prellenado funciona
+  // igual (usa el token de la URL), pero el historial y el envío no.
+  const { haySesion, marcarSesionIniciada } = useSesionEnlace();
 
   /**
    * Deja provincia y municipio en consonancia con un código postal que llega
@@ -258,9 +263,13 @@ export default function ContratoPage() {
 
 
   const cargarContratos = async () => {
+    const token = obtenerToken();
+    // Un enlace de CloudNavis puede abrirse sin sesión: en ese caso el modal de
+    // login ya lo está pidiendo y no tiene sentido llamar ni avisar de nada.
+    if (!token) return;
+
     setContratosLoading(true);
     try {
-      const token = obtenerToken();
       // Sin limit el backend devuelve solo 10 registros y el historial parece
       // incompleto; la tabla pagina por su cuenta sobre lo que llegue.
       const response = await fetch(
@@ -691,6 +700,14 @@ export default function ContratoPage() {
         errorCode={errorCode || ""}
         onRetry={handleRetryFetch}
         onContinue={() => setErrorCode(null)}
+      />
+      <LoginRequeridoModal
+        abierto={!haySesion}
+        onSesionIniciada={() => {
+          marcarSesionIniciada();
+          // El historial no se pudo cargar sin sesión; ahora sí.
+          cargarContratos();
+        }}
       />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
