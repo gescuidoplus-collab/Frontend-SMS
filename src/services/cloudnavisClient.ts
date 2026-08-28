@@ -27,6 +27,7 @@ export interface CloudnavisEmpleador {
   dni: string;
   nombre: string;
   apellidos: string;
+  sexo?: string;
   email: string;
   direccion: string;
   provincia: string;

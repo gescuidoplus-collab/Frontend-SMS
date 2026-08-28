@@ -25,8 +25,8 @@ import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
-import { fetchCloudnavisEmpleado } from "@/services/cloudnavisClient";
-import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
+import { fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
+import { mapClienteToDocumentosGrupo } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 import LoginRequeridoModal from "@/components/LoginRequeridoModal";
 import { useSesionEnlace } from "@/lib/useSesionEnlace";
@@ -100,15 +100,17 @@ export default function DocumentosGrupoPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const idEmpleado = params.get("idEmpleado");
+    // Este paquete va a nombre del cliente, así que su enlace sigue trayendo
+    // idCliente y no pasa por el servicio como el contrato y el finiquito.
+    const idCliente = params.get("idCliente");
     const token = params.get("token");
 
     // Sin parametros se entra a rellenar a mano, que es lo normal.
-    if (!idEmpleado && !token) return;
+    if (!idCliente && !token) return;
 
     // Pero si el enlace trae algo y le falta lo esencial, hay que decirlo:
     // antes se salia en silencio y el formulario aparecia vacio sin motivo.
-    if (!idEmpleado || !token) {
+    if (!idCliente || !token) {
       setErrorCode("ENLACE_INCOMPLETO");
       return;
     }
@@ -118,20 +120,14 @@ export default function DocumentosGrupoPage() {
 
     (async () => {
       try {
-        const empleado = await fetchCloudnavisEmpleado(idEmpleado, token);
-        const { diaNacimiento, mesNacimiento, anioNacimiento, ...mapped } =
-          mapEmpleadoToDocumentosGrupo(empleado);
-        const fechaNacimiento =
-          diaNacimiento && mesNacimiento && anioNacimiento
-            ? dayjs(`${anioNacimiento}-${mesNacimiento}-${diaNacimiento}`, "YYYY-M-D")
-            : undefined;
-        form.setFieldsValue({ ...mapped, fechaNacimiento });
+        const cliente = await fetchCloudnavisEmpleador(idCliente, token);
+        form.setFieldsValue(mapClienteToDocumentosGrupo(cliente));
       } catch (err) {
         const error = err as Error;
         if (error.message === "TOKEN_INVALID") {
           setErrorCode("TOKEN_INVALID");
-        } else if (error.message === "EMPLEADO_NOT_FOUND") {
-          setErrorCode("EMPLEADO_NOT_FOUND");
+        } else if (error.message === "EMPLEADOR_NOT_FOUND") {
+          setErrorCode("EMPLEADOR_NOT_FOUND");
         } else if (error.message === "NETWORK_ERROR") {
           setErrorCode("NETWORK_ERROR");
         } else {
