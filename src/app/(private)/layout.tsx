@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "@/components/LogoutButtom/Index";
 import { obtenerToken } from "@/lib/session";
+import { esEnlaceDeCloudnavis } from "@/lib/enlaceCloudnavis";
 import { MessageOutlined, CalculatorOutlined, FileTextOutlined } from "@ant-design/icons";
 
 const { Header, Content, Sider } = Layout;
@@ -21,9 +22,15 @@ export default function PrivateLayout({
   useEffect(() => {
     // obtenerToken limpia también la cookie si el token ha caducado, para que
     // el middleware no vuelva a mandarnos aquí y se forme un bucle.
-    if (!obtenerToken()) {
-      window.location.href = "/login";
-    }
+    if (obtenerToken()) return;
+
+    // Los enlaces de CloudNavis se abren a propósito sin sesión: la página
+    // pide las credenciales en un modal. Sacarlos de aquí borraría el query
+    // string y dejaría el enlace inservible.
+    if (esEnlaceDeCloudnavis(new URLSearchParams(window.location.search))) return;
+
+    const destino = window.location.pathname + window.location.search;
+    window.location.href = `/login?next=${encodeURIComponent(destino)}`;
   }, []);
 
   const handleMenuClick = (key: string) => {
