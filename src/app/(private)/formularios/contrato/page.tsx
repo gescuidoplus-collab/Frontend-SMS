@@ -696,7 +696,8 @@ export default function ContratoPage() {
   return (
     <>
       <CloudnavisErrorModal
-        visible={!!errorCode}
+        // Sin sesión manda el modal de login: apilar dos avisos confunde.
+        visible={!!errorCode && haySesion}
         errorCode={errorCode || ""}
         onRetry={handleRetryFetch}
         onContinue={() => setErrorCode(null)}
