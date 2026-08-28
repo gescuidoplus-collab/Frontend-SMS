@@ -31,6 +31,9 @@ export interface DocumentosGrupoFormValues {
   codigoSwift?: string;
   numeroCuenta?: string;
   cuentaCotizacion?: string;
+  correo?: string;
+  telefono?: string;
+  razonSocial?: string;
   lugarFirma?: string;
   fechaFirma?: string;
 }
@@ -204,6 +207,96 @@ export function mapEmpleadoToDocumentosGrupo(
 
   if (data.cuentaCorriente) {
     result.numeroCuenta = data.cuentaCorriente;
+  }
+
+  return result;
+}
+
+/**
+ * Deduce el tipo de documento a partir del propio número.
+ *
+ * El NIE español empieza por X, Y o Z; cualquier otra cosa se trata como DNI.
+ * CloudNavis no distingue entre uno y otro, así que hay que mirarlo aquí.
+ */
+function tipoDeDocumento(dni: string): 'dni' | 'nie' {
+  return /^[XYZ]/i.test(dni.trim()) ? 'nie' : 'dni';
+}
+
+/**
+ * Datos del cliente para el paquete de documentos de alta.
+ *
+ * Este formulario va a nombre del empleador (el cliente), no de la empleada:
+ * los tres modelos que genera son suyos, y por eso su enlace lleva idCliente.
+ */
+export function mapClienteToDocumentosGrupo(
+  data: CloudnavisEmpleador
+): Partial<DocumentosGrupoFormValues> {
+  const result: Partial<DocumentosGrupoFormValues> = {};
+
+  if (data.nombre) {
+    result.nombres = data.nombre.replace(/\s+/g, ' ').trim();
+  }
+
+  if (data.apellidos) {
+    const { primerApellido, segundoApellido } = splitApellidos(data.apellidos);
+    result.primerApellido = primerApellido;
+    result.segundoApellido = segundoApellido;
+  }
+
+  if (data.dni) {
+    const documento = data.dni.trim();
+    result.nif = documento;
+    // El modelo TA1 pide el documento por separado, con su tipo marcado.
+    result.numeroDocumento = documento;
+    result.tipoDocumento = tipoDeDocumento(documento);
+  }
+
+  if (data.sexo) {
+    result.sexo = mapSexo(data.sexo);
+  }
+
+  if (data.direccion) {
+    result.nombreVia = data.direccion;
+  }
+
+  if (data.provincia) {
+    result.provincia = data.provincia;
+  }
+
+  if (data.municipio) {
+    result.municipio = data.municipio;
+  }
+
+  if (data.codigoPostal) {
+    result.codPostal = data.codigoPostal;
+  }
+
+  if (data.cuentaCorriente) {
+    result.numeroCuenta = data.cuentaCorriente;
+  }
+
+  if (data.codigoCuentaCotizacion) {
+    result.cuentaCotizacion = data.codigoCuentaCotizacion;
+  }
+
+  if (data.email) {
+    result.correo = data.email;
+  }
+
+  if (data.telefono1) {
+    result.telefono = data.telefono1;
+  }
+
+  // En el empleo de hogar el empleador es una persona física, así que su
+  // nombre completo hace de razón social en el modelo FR con CCC.
+  const nombre = nombreCompleto(data.nombre, data.apellidos);
+  if (nombre) {
+    result.razonSocial = nombre;
+  }
+
+  // El municipio es también donde se firma, igual que en el contrato.
+  if (data.municipio) {
+    result.lugarFirma = data.municipio;
   }
 
   return result;
