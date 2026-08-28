@@ -1,5 +1,9 @@
 import dayjs from 'dayjs';
-import type { CloudnavisEmpleado, CloudnavisEmpleador } from './cloudnavisClient';
+import type {
+  CloudnavisEmpleado,
+  CloudnavisEmpleador,
+  CloudnavisServicio,
+} from './cloudnavisClient';
 
 /**
  * Form values for Documentos Grupo
@@ -54,13 +58,18 @@ export interface ContratoFormValues {
   nacionalidadtrabajador?: string;
   municipiodomtrabajador?: string;
   paisdomtrabajador?: string;
-  fechacontrato?: string;
+  fechacontrato?: dayjs.Dayjs;
   montobruto?: number;
   lugarfirma?: string;
   mesfirma?: string;
   diafirma?: string;
   anofirma?: string;
   fechanactrabajador?: dayjs.Dayjs;
+  cuentaCotizacion?: string;
+  interExterno?: string;
+  // Cláusulas que se pueden deducir del servicio
+  clausulaPuesto?: string;
+  clausulaDistribucion?: string;
 }
 
 /**
@@ -72,6 +81,25 @@ export interface FiniquitoFormValues {
   correoempleada?: string;
   nomempleador?: string;
   correoempleador?: string;
+  fechadesde?: dayjs.Dayjs;
+  fechasalariofinalconanio?: dayjs.Dayjs;
+  salarioNeto?: number;
+  tipoJornada?: 'lv' | 'finde';
+}
+
+/**
+ * Une nombre y apellidos en una sola línea.
+ *
+ * CloudNavis devuelve los campos con espacios sobrantes ("Luis Maria ",
+ * " Jimenez Arias "), y sin limpiarlos el nombre sale con espacios dobles en
+ * el contrato y en el finiquito.
+ */
+function nombreCompleto(nombre?: string, apellidos?: string): string {
+  return [nombre, apellidos]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -199,10 +227,9 @@ export function mapEmpleadoToContrato(
 ): Partial<ContratoFormValues> {
   const result: Partial<ContratoFormValues> = {};
 
-  if (data.nombre && data.apellidos) {
-    result.nombretrabajador = `${data.nombre} ${data.apellidos}`;
-  } else if (data.nombre) {
-    result.nombretrabajador = data.nombre;
+  const nombretrabajador = nombreCompleto(data.nombre, data.apellidos);
+  if (nombretrabajador) {
+    result.nombretrabajador = nombretrabajador;
   }
 
   if (data.dni) {
@@ -230,6 +257,11 @@ export function mapEmpleadoToContrato(
     result.municipiodomtrabajador = data.municipio;
   }
 
+  // El número de afiliación viene como `naf` y se pedía a mano.
+  if (data.naf) {
+    result.numafiliaciontrabajador = data.naf;
+  }
+
   return result;
 }
 
@@ -249,10 +281,9 @@ export function mapEmpleadorToContrato(
 ): Partial<ContratoFormValues> {
   const result: Partial<ContratoFormValues> = {};
 
-  if (data.nombre && data.apellidos) {
-    result.nomempleador = `${data.nombre} ${data.apellidos}`;
-  } else if (data.nombre) {
-    result.nomempleador = data.nombre;
+  const nomempleador = nombreCompleto(data.nombre, data.apellidos);
+  if (nomempleador) {
+    result.nomempleador = nomempleador;
   }
 
   if (data.dni) {
@@ -275,6 +306,97 @@ export function mapEmpleadorToContrato(
     result.municipio = data.municipio;
   }
 
+  // Es el campo que se reparte entre las casillas de la cuenta de cotización;
+  // no tiene longitud fija (el de ejemplo trae 15 dígitos).
+  if (data.codigoCuentaCotizacion) {
+    result.cuentaCotizacion = data.codigoCuentaCotizacion;
+  }
+
+  return result;
+}
+
+/**
+ * La descripción del servicio ("Externa 1 h L-V", "Interna fin de semana"…)
+ * indica de paso si la jornada es interna o externa y si es de fin de semana.
+ */
+function interExternoDeDescripcion(descripcion?: string): string | undefined {
+  if (!descripcion) return undefined;
+
+  const texto = descripcion.toLowerCase();
+  const esFinde = /fin(es)?\s+de\s+semana|finde/.test(texto);
+
+  if (texto.includes('interna')) return esFinde ? 'Interna fin de semana' : 'Interna';
+  if (texto.includes('externa')) return esFinde ? 'Externa fin de semana' : 'Externa';
+  return undefined;
+}
+
+/**
+ * Datos del contrato que salen del propio servicio: las condiciones económicas
+ * y de jornada, que antes había que teclear a mano.
+ */
+export function mapServicioToContrato(
+  data: CloudnavisServicio
+): Partial<ContratoFormValues> {
+  const result: Partial<ContratoFormValues> = {};
+
+  if (data.fechaInicio) {
+    result.fechacontrato = dayjs(data.fechaInicio, 'YYYY-MM-DD');
+  }
+
+  // El contrato recoge el bruto; el neto de fin de semana solo aplica a esas
+  // jornadas y es el que manda cuando viene informado.
+  const bruto = data.sueldoNetoFinSemana ?? data.sueldoBruto;
+  if (typeof bruto === 'number' && bruto > 0) {
+    result.montobruto = bruto;
+  }
+
+  const interExterno = interExternoDeDescripcion(data.descripcion);
+  if (interExterno) {
+    result.interExterno = interExterno;
+  }
+
+  if (data.horario) {
+    result.clausulaDistribucion = data.horario;
+  }
+
+  if (data.funciones) {
+    result.clausulaPuesto = data.funciones;
+  }
+
+  return result;
+}
+
+/**
+ * Datos del finiquito que salen del servicio: el alta, la baja y el salario
+ * sobre el que se calcula todo.
+ */
+export function mapServicioToFiniquito(
+  data: CloudnavisServicio
+): Partial<FiniquitoFormValues> {
+  const result: Partial<FiniquitoFormValues> = {};
+
+  if (data.fechaInicio) {
+    result.fechadesde = dayjs(data.fechaInicio, 'YYYY-MM-DD');
+  }
+
+  if (data.fechaFin) {
+    result.fechasalariofinalconanio = dayjs(data.fechaFin, 'YYYY-MM-DD');
+  }
+
+  // El finiquito se calcula siempre sobre el neto.
+  const neto = data.sueldoNetoFinSemana ?? data.sueldoNeto;
+  if (typeof neto === 'number' && neto > 0) {
+    result.salarioNeto = neto;
+  }
+
+  // Una descripción de fin de semana cambia el precio del día del último período.
+  const interExterno = interExternoDeDescripcion(data.descripcion);
+  if (interExterno?.includes('fin de semana')) {
+    result.tipoJornada = 'finde';
+  } else if (interExterno) {
+    result.tipoJornada = 'lv';
+  }
+
   return result;
 }
 
@@ -291,10 +413,9 @@ export function mapEmpleadoToFiniquito(
 ): Partial<FiniquitoFormValues> {
   const result: Partial<FiniquitoFormValues> = {};
 
-  if (data.nombre && data.apellidos) {
-    result.nomempleada = `${data.nombre} ${data.apellidos}`;
-  } else if (data.nombre) {
-    result.nomempleada = data.nombre;
+  const nomempleada = nombreCompleto(data.nombre, data.apellidos);
+  if (nomempleada) {
+    result.nomempleada = nomempleada;
   }
 
   if (data.dni) {
@@ -320,10 +441,9 @@ export function mapEmpleadorToFiniquito(
 ): Partial<FiniquitoFormValues> {
   const result: Partial<FiniquitoFormValues> = {};
 
-  if (data.nombre && data.apellidos) {
-    result.nomempleador = `${data.nombre} ${data.apellidos}`;
-  } else if (data.nombre) {
-    result.nomempleador = data.nombre;
+  const nomempleador = nombreCompleto(data.nombre, data.apellidos);
+  if (nomempleador) {
+    result.nomempleador = nomempleador;
   }
 
   if (data.email) {

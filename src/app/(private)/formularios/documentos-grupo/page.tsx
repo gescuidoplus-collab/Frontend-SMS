@@ -28,6 +28,8 @@ import "dayjs/locale/es";
 import { fetchCloudnavisEmpleado } from "@/services/cloudnavisClient";
 import { mapEmpleadoToDocumentosGrupo } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import LoginRequeridoModal from "@/components/LoginRequeridoModal";
+import { useSesionEnlace } from "@/lib/useSesionEnlace";
 import { obtenerToken } from "@/lib/session";
 import { API_URL } from "@/lib/config";
 
@@ -91,6 +93,9 @@ export default function DocumentosGrupoPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [documentos, setDocumentos] = useState<DocumentoGrupoRecord[]>([]);
   const [documentosLoading, setDocumentosLoading] = useState(false);
+  // Un enlace de CloudNavis puede abrirse sin sesión: el prellenado funciona
+  // igual (usa el token de la URL), pero el historial y el envío no.
+  const { haySesion, marcarSesionIniciada } = useSesionEnlace();
   const router = useRouter();
 
   useEffect(() => {
@@ -98,7 +103,13 @@ export default function DocumentosGrupoPage() {
     const idEmpleado = params.get("idEmpleado");
     const token = params.get("token");
 
+    // Sin parametros se entra a rellenar a mano, que es lo normal.
+    if (!idEmpleado && !token) return;
+
+    // Pero si el enlace trae algo y le falta lo esencial, hay que decirlo:
+    // antes se salia en silencio y el formulario aparecia vacio sin motivo.
     if (!idEmpleado || !token) {
+      setErrorCode("ENLACE_INCOMPLETO");
       return;
     }
 
@@ -133,9 +144,13 @@ export default function DocumentosGrupoPage() {
   }, [form]);
 
   const cargarDocumentos = async () => {
+    const token = obtenerToken();
+    // Un enlace de CloudNavis puede abrirse sin sesión: en ese caso el modal de
+    // login ya lo está pidiendo y no tiene sentido llamar ni avisar de nada.
+    if (!token) return;
+
     setDocumentosLoading(true);
     try {
-      const token = obtenerToken();
       const res = await fetch(`${API_URL}/documentos-grupo/lista?limit=200`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -435,6 +450,14 @@ export default function DocumentosGrupoPage() {
         errorCode={errorCode || ""}
         onRetry={handleRetryFetch}
         onContinue={() => setErrorCode(null)}
+      />
+      <LoginRequeridoModal
+        abierto={!haySesion}
+        onSesionIniciada={() => {
+          marcarSesionIniciada();
+          // El historial no se pudo cargar sin sesión; ahora sí.
+          cargarDocumentos();
+        }}
       />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>

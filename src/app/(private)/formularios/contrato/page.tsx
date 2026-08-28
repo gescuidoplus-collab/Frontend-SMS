@@ -30,9 +30,20 @@ import { PROVINCIAS, municipiosDe, codigosDe, ubicacionDe } from "@/data/codigos
 import type { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { useRouter } from "next/navigation";
-import { fetchCloudnavisEmpleado, fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
-import { mapEmpleadoToContrato, mapEmpleadorToContrato } from "@/services/mappers";
+import {
+  fetchCloudnavisEmpleado,
+  fetchCloudnavisEmpleador,
+  fetchCloudnavisServicio,
+  idEmpleadoDeAsignacion,
+} from "@/services/cloudnavisClient";
+import {
+  mapEmpleadoToContrato,
+  mapEmpleadorToContrato,
+  mapServicioToContrato,
+} from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
+import LoginRequeridoModal from "@/components/LoginRequeridoModal";
+import { useSesionEnlace } from "@/lib/useSesionEnlace";
 import { obtenerToken } from "@/lib/session";
 import { API_URL } from "@/lib/config";
 
@@ -222,6 +233,9 @@ export default function ContratoPage() {
   // acotando los desplegables: al backend se le sigue mandando el código.
   const [provinciaCp, setProvinciaCp] = useState<string | undefined>();
   const [municipioCp, setMunicipioCp] = useState<string | undefined>();
+  // Un enlace de CloudNavis puede abrirse sin sesión: el prellenado funciona
+  // igual (usa el token de la URL), pero el historial y el envío no.
+  const { haySesion, marcarSesionIniciada } = useSesionEnlace();
 
   /**
    * Deja provincia y municipio en consonancia con un código postal que llega
@@ -249,9 +263,13 @@ export default function ContratoPage() {
 
 
   const cargarContratos = async () => {
+    const token = obtenerToken();
+    // Un enlace de CloudNavis puede abrirse sin sesión: en ese caso el modal de
+    // login ya lo está pidiendo y no tiene sentido llamar ni avisar de nada.
+    if (!token) return;
+
     setContratosLoading(true);
     try {
-      const token = obtenerToken();
       // Sin limit el backend devuelve solo 10 registros y el historial parece
       // incompleto; la tabla pagina por su cuenta sobre lo que llegue.
       const response = await fetch(
@@ -293,11 +311,17 @@ export default function ContratoPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const idEmpleado = params.get("idEmpleado");
-    const idCliente = params.get("idCliente");
+    const idServicio = params.get("idServicio");
+    const idAsignacion = params.get("idAsignacion");
     const token = params.get("token");
 
-    if (!idEmpleado || !idCliente || !token) {
+    // Sin parametros se entra a rellenar a mano, que es lo normal.
+    if (!idServicio && !idAsignacion && !token) return;
+
+    // Pero si el enlace trae algo y le falta lo esencial, hay que decirlo:
+    // antes se salia en silencio y el formulario aparecia vacio sin motivo.
+    if (!idServicio || !idAsignacion || !token) {
+      setErrorCode("ENLACE_INCOMPLETO");
       return;
     }
 
@@ -306,15 +330,28 @@ export default function ContratoPage() {
 
     (async () => {
       try {
+        // El servicio es el punto de entrada: de él salen el cliente y, dentro
+        // de sus asignaciones, la empleada a la que corresponde este enlace.
+        const servicio = await fetchCloudnavisServicio(idServicio, token);
+
+        const idEmpleado = idEmpleadoDeAsignacion(servicio, idAsignacion);
+        if (!idEmpleado) {
+          // Sin la asignación no se sabe de quién es el contrato, y coger otra
+          // sería asignárselo a la persona equivocada sin avisar.
+          setErrorCode("ASIGNACION_NOT_FOUND");
+          return;
+        }
+
         const [empleado, empleador] = await Promise.all([
           fetchCloudnavisEmpleado(idEmpleado, token),
-          fetchCloudnavisEmpleador(idCliente, token),
+          fetchCloudnavisEmpleador(servicio.idUsuario, token),
         ]);
 
-        const mappedEmpleado = mapEmpleadoToContrato(empleado);
-        const mappedEmpleador = mapEmpleadorToContrato(empleador);
-
-        form.setFieldsValue({ ...mappedEmpleado, ...mappedEmpleador });
+        form.setFieldsValue({
+          ...mapServicioToContrato(servicio),
+          ...mapEmpleadoToContrato(empleado),
+          ...mapEmpleadorToContrato(empleador),
+        });
         sincronizarCodigoPostal(form.getFieldValue("codPostal"));
 
         // Cargar historial de contratos del empleado
@@ -323,6 +360,8 @@ export default function ContratoPage() {
         const error = err as Error;
         if (error.message === "TOKEN_INVALID") {
           setErrorCode("TOKEN_INVALID");
+        } else if (error.message === "SERVICIO_NOT_FOUND") {
+          setErrorCode("SERVICIO_NOT_FOUND");
         } else if (error.message === "EMPLEADO_NOT_FOUND") {
           setErrorCode("EMPLEADO_NOT_FOUND");
         } else if (error.message === "EMPLEADOR_NOT_FOUND") {
@@ -661,6 +700,14 @@ export default function ContratoPage() {
         errorCode={errorCode || ""}
         onRetry={handleRetryFetch}
         onContinue={() => setErrorCode(null)}
+      />
+      <LoginRequeridoModal
+        abierto={!haySesion}
+        onSesionIniciada={() => {
+          marcarSesionIniciada();
+          // El historial no se pudo cargar sin sesión; ahora sí.
+          cargarContratos();
+        }}
       />
     <div style={{ background: "#f5f8ff", minHeight: "100vh", padding: "24px" }}>
       <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>

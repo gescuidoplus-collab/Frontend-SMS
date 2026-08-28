@@ -35,6 +35,22 @@ const ERROR_MESSAGES: Record<string, ErrorMessage> = {
     title: 'Error procesando datos',
     message: 'Hubo un problema al procesar los datos. Contacta con soporte.',
   },
+  SERVICIO_NOT_FOUND: {
+    title: 'Servicio no encontrado',
+    message: 'No encontramos el servicio indicado en el enlace. Verifica el ID e intenta nuevamente.',
+  },
+  ASIGNACION_NOT_FOUND: {
+    title: 'Asignación no encontrada',
+    message:
+      'El servicio existe, pero no tiene ninguna asignación con el identificador del enlace, así que no sabemos a qué empleada corresponde. Pide un enlace actualizado o rellena el formulario a mano.',
+  },
+  // Antes, un enlace al que le faltaba algun parametro simplemente no hacia
+  // nada: el formulario salia vacio sin explicar por que.
+  ENLACE_INCOMPLETO: {
+    title: 'El enlace está incompleto',
+    message:
+      'Al enlace le falta algún dato (idServicio, idAsignacion o token), así que no se han podido traer los datos de CloudNavis. Puedes rellenar el formulario a mano o pedir un enlace nuevo.',
+  },
 };
 
 const CloudnavisErrorModal: React.FC<CloudnavisErrorModalProps> = ({
