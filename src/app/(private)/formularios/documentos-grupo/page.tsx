@@ -19,7 +19,9 @@ import {
   Empty,
   Spin,
   Divider,
+  Checkbox,
 } from "antd";
+import type { CheckboxChangeEvent } from "antd/es/checkbox";
 import { CheckCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
@@ -35,8 +37,40 @@ import { API_URL } from "@/lib/config";
 
 const { Title, Text } = Typography;
 
+/** Modelos del paquete de alta. Las claves son las que entiende el backend. */
+type ClaveDocumento = "fr103" | "ta1" | "fr-ccc" | "sepa";
+
+const DOCUMENTOS_DISPONIBLES: { clave: ClaveDocumento; nombre: string; descripcion: string }[] = [
+  { clave: "fr103", nombre: "FR103", descripcion: "Solicitud de afiliación / alta" },
+  { clave: "ta1", nombre: "TA1", descripcion: "Solicitud de número de la Seguridad Social" },
+  { clave: "fr-ccc", nombre: "FR con CCC", descripcion: "Autorización del empleador con CCC" },
+  { clave: "sepa", nombre: "SEPA (TC 1/15-3)", descripcion: "Orden de domiciliación de cuotas" },
+];
+
+/** Casillas del SEPA. Cada grupo admite una sola marca, como en el modelo impreso. */
+const SEPA_TIPOS_SOLICITUD = [
+  { value: "alta", label: "Alta en domiciliación" },
+  { value: "baja", label: "Baja en domiciliación (sin IBAN)" },
+  { value: "cambio", label: "Cambio de datos bancarios" },
+];
+
+const SEPA_REGIMENES = [
+  { value: "autonomos", label: "R.E. Trabajadores Autónomos" },
+  { value: "agrario", label: "S.E. Agrario. Inactividad trabajador" },
+  { value: "hogar", label: "S.E. Empleados del Hogar" },
+  { value: "convenio", label: "Convenio especial" },
+  { value: "mar", label: "R.E. Mar trabajador cuenta propia" },
+  { value: "deudas", label: "Deudas y aplazamientos" },
+];
+
+const TODAS_LAS_CLAVES: ClaveDocumento[] = DOCUMENTOS_DISPONIBLES.map((d) => d.clave);
+
+const nombreDocumento = (clave: string) =>
+  DOCUMENTOS_DISPONIBLES.find((d) => d.clave === clave)?.nombre || clave;
+
 interface DocumentoGrupoRecord {
   _id: string;
+  documentosSeleccionados?: string[];
   nombres?: string;
   primerApellido?: string;
   segundoApellido?: string;
@@ -51,6 +85,7 @@ interface DocumentoGrupoRecord {
 }
 
 interface FormValues {
+  documentos?: ClaveDocumento[];
   primerApellido?: string;
   segundoApellido?: string;
   nombres?: string;
@@ -71,11 +106,45 @@ interface FormValues {
   codigoSwift?: string;
   numeroCuenta?: string;
   cuentaCotizacion?: string;
+  titularCuenta?: string;
   correo?: string;
   telefono?: string;
   razonSocial?: string;
+  tipoDocumentoEmpleador?: string;
+  numeroDocumentoEmpleador?: string;
+  sepaTipoSolicitud?: string;
+  sepaRegimen?: string;
   lugarFirma?: string;
   fechaFirma?: Dayjs;
+}
+
+/**
+ * Grupo de casillas de una sola marca: se puede marcar una, cambiarla o
+ * dejarlas todas sin marcar (un Radio no permite desmarcar).
+ */
+function CasillasUnicas({
+  opciones,
+  value,
+  onChange,
+}: {
+  opciones: { value: string; label: string }[];
+  value?: string;
+  onChange?: (v: string | undefined) => void;
+}) {
+  return (
+    <Row gutter={[16, 8]}>
+      {opciones.map((o) => (
+        <Col xs={24} sm={12} md={8} key={o.value}>
+          <Checkbox
+            checked={value === o.value}
+            onChange={(e: CheckboxChangeEvent) => onChange?.(e.target.checked ? o.value : undefined)}
+          >
+            {o.label}
+          </Checkbox>
+        </Col>
+      ))}
+    </Row>
+  );
 }
 
 const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
@@ -89,6 +158,9 @@ const formatearFecha = (date: Dayjs | undefined, tipo: "completa"): string => {
 
 export default function DocumentosGrupoPage() {
   const [form] = Form.useForm();
+  // Sin ningún documento marcado no hay nada que generar: el botón se bloquea.
+  const documentosMarcados = Form.useWatch("documentos", form) as ClaveDocumento[] | undefined;
+  const haySeleccion = (documentosMarcados?.length ?? 0) > 0;
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [documentos, setDocumentos] = useState<DocumentoGrupoRecord[]>([]);
@@ -188,8 +260,8 @@ export default function DocumentosGrupoPage() {
       content: (
         <div>
           <p style={{ marginBottom: 12 }}>
-            Con este enlace se pueden ver y firmar los tres documentos de una vez,
-            sin necesidad de correo ni de crear una cuenta.
+            Con este enlace se pueden ver y firmar todos los documentos del paquete de
+            una vez, sin necesidad de correo ni de crear una cuenta.
           </p>
           {links.map((l) => (
             <div key={l.role} style={{ marginBottom: 16 }}>
@@ -309,9 +381,11 @@ export default function DocumentosGrupoPage() {
     message.loading({ content: "Enviando documentos...", key: "sending" });
 
     try {
-      const { fechaNacimiento, ...resto } = values;
+      const { fechaNacimiento, documentos: seleccion, ...resto } = values;
       const payload = {
         ...resto,
+        // Se mandan en el orden fijo del paquete; el backend vuelve a validarlo
+        documentos: TODAS_LAS_CLAVES.filter((c) => (seleccion || []).includes(c)),
         fechaFirma: formatearFecha(values.fechaFirma, "completa"),
         diaNacimiento: fechaNacimiento?.date(),
         mesNacimiento: fechaNacimiento ? fechaNacimiento.month() + 1 : undefined,
@@ -336,6 +410,8 @@ export default function DocumentosGrupoPage() {
       if (response.ok) {
         const resultado = await response.json();
         const links: { role: string; link: string }[] = resultado?.data?.signingLinks || [];
+        const generados: string[] = resultado?.data?.documentos || payload.documentos;
+        const nombresGenerados = generados.map(nombreDocumento).join(", ");
 
         message.success("✓ Documentos generados correctamente");
         cargarDocumentos();
@@ -347,8 +423,10 @@ export default function DocumentosGrupoPage() {
             content: (
               <div>
                 <p style={{ marginBottom: 12 }}>
-                  Se han generado los tres modelos (FR103, TA1 y FR con CCC) en un único
-                  documento. Comparte este enlace para que se firme; no hace falta correo.
+                  {generados.length === 1
+                    ? `Se ha generado el modelo ${nombresGenerados}.`
+                    : `Se han generado ${generados.length} modelos (${nombresGenerados}) en un único documento.`}{" "}
+                  Comparte este enlace para que se firme; no hace falta correo.
                 </p>
                 {links.map((l) => (
                   <div key={l.role} style={{ marginBottom: 12 }}>
@@ -483,6 +561,7 @@ export default function DocumentosGrupoPage() {
             layout="vertical"
             onFinish={onFinish}
             autoComplete="off"
+            initialValues={{ documentos: TODAS_LAS_CLAVES, sepaTipoSolicitud: "cambio" }}
           >
             {/* Sección: Datos Personales */}
             <Card title="Datos Personales" style={{ marginBottom: "24px" }}>
@@ -656,12 +735,22 @@ export default function DocumentosGrupoPage() {
                     <Input placeholder="Ej. ES9121000418450200051332" />
                   </Form.Item>
                 </Col>
-                <Col xs={24}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     label="Cuenta de Cotización"
                     name="cuentaCotizacion"
+                    tooltip="En el SEPA va como Nº identificativo de Seguridad Social"
                   >
                     <Input placeholder="Ej. 1234567890" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Titular de la Cuenta"
+                    name="titularCuenta"
+                    tooltip="Aparece en el SEPA. Si se deja vacío se usa el nombre de la persona del formulario"
+                  >
+                    <Input placeholder="Por defecto, la persona del formulario" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -693,12 +782,44 @@ export default function DocumentosGrupoPage() {
                   <Form.Item
                     label="Razón Social del Empleador"
                     name="razonSocial"
-                    tooltip="Aparece en el FR con CCC"
+                    tooltip="Aparece en el FR con CCC y como sujeto obligado al pago en el SEPA"
                   >
                     <Input placeholder="Ej. CuidoFam SL" />
                   </Form.Item>
                 </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Documento del Empleador"
+                    tooltip="Responsable del pago en el SEPA"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Space.Compact style={{ width: "100%" }}>
+                      <Form.Item name="tipoDocumentoEmpleador" noStyle>
+                        <Select style={{ width: "35%" }} placeholder="Tipo" allowClear>
+                          <Select.Option value="dni">DNI</Select.Option>
+                          <Select.Option value="nie">NIE</Select.Option>
+                          <Select.Option value="pasaporte">Pasaporte</Select.Option>
+                          <Select.Option value="cif">CIF</Select.Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item name="numeroDocumentoEmpleador" noStyle>
+                        <Input style={{ width: "65%" }} placeholder="Ej. 12345678Z" />
+                      </Form.Item>
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
               </Row>
+            </Card>
+
+            {/* Sección: SEPA. Las casillas del modelo TC 1/15-3; el resto de sus
+                datos salen de las secciones anteriores. */}
+            <Card title="Domiciliación SEPA (TC 1/15-3)" style={{ marginBottom: "24px" }}>
+              <Form.Item label="Tipo de solicitud" name="sepaTipoSolicitud">
+                <CasillasUnicas opciones={SEPA_TIPOS_SOLICITUD} />
+              </Form.Item>
+              <Form.Item label="Régimen" name="sepaRegimen" style={{ marginBottom: 0 }}>
+                <CasillasUnicas opciones={SEPA_REGIMENES} />
+              </Form.Item>
             </Card>
 
             {/* Sección: Firma */}
@@ -724,10 +845,58 @@ export default function DocumentosGrupoPage() {
               </Row>
             </Card>
 
+            {/* Sección: Documentos a generar. Por defecto van los tres, pero se
+                puede quitar alguno; el enlace de firma solo incluirá los marcados. */}
+            <Card
+              title="Documentos a generar"
+              style={{ marginBottom: "24px" }}
+              extra={
+                <Button size="small" onClick={() => form.setFieldValue("documentos", TODAS_LAS_CLAVES)}>
+                  Todos
+                </Button>
+              }
+            >
+              <Form.Item
+                name="documentos"
+                style={{ marginBottom: 0 }}
+                rules={[
+                  {
+                    validator: (_, value: ClaveDocumento[] | undefined) =>
+                      value && value.length > 0
+                        ? Promise.resolve()
+                        : Promise.reject(new Error("Selecciona al menos un documento")),
+                  },
+                ]}
+              >
+                <Checkbox.Group style={{ width: "100%" }}>
+                  <Row gutter={[16, 16]}>
+                    {DOCUMENTOS_DISPONIBLES.map((d) => (
+                      <Col xs={24} sm={12} md={6} key={d.clave}>
+                        <Checkbox value={d.clave}>
+                          <Space direction="vertical" size={0}>
+                            <Text strong>{d.nombre}</Text>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {d.descripcion}
+                            </Text>
+                          </Space>
+                        </Checkbox>
+                      </Col>
+                    ))}
+                  </Row>
+                </Checkbox.Group>
+              </Form.Item>
+            </Card>
+
             <Form.Item style={{ marginBottom: 0 }}>
               <Space>
-                <Button type="primary" htmlType="submit" loading={loading}>
-                  Enviar Formulario
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={loading}
+                  disabled={!haySeleccion}
+                  title={haySeleccion ? undefined : "Marca al menos un documento"}
+                >
+                  Generar documentos
                 </Button>
                 <Button onClick={() => form.resetFields()}>
                   Limpiar
@@ -780,6 +949,22 @@ export default function DocumentosGrupoPage() {
                           <Text type="secondary" style={{ fontSize: 12 }}>
                             {record.numeroDocumento || record.nif}
                           </Text>
+                        </Space>
+                      ),
+                      width: 200,
+                    },
+                    {
+                      title: "Documentos",
+                      key: "documentos",
+                      render: (_, record) => (
+                        <Space size={4} wrap>
+                          {/* Los registros antiguos no guardan la selección: llevan los tres */}
+                          {(record.documentosSeleccionados?.length
+                            ? record.documentosSeleccionados
+                            : TODAS_LAS_CLAVES
+                          ).map((c) => (
+                            <Tag key={c}>{nombreDocumento(c)}</Tag>
+                          ))}
                         </Space>
                       ),
                       width: 200,
