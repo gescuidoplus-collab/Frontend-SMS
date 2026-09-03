@@ -791,8 +791,8 @@ export default function DocumentosGrupoPage() {
                 </Col>
                 <Col xs={24} sm={12}>
                   <Form.Item
-                    label="Documento del Empleador"
-                    tooltip="Responsable del pago en el SEPA"
+                    label="Documento del responsable del pago (solo si es otra persona)"
+                    tooltip="Va en el SEPA como documento del responsable de pago. Si se deja vacío se usa el NIF de «Datos Personales», marcando DNI o tarjeta de extranjero según su letra."
                     style={{ marginBottom: 0 }}
                   >
                     <Space.Compact style={{ width: "100%" }}>

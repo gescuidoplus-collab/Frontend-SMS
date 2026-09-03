@@ -272,9 +272,8 @@ export function mapClienteToDocumentosGrupo(
     result.codPostal = data.codigoPostal;
   }
 
-  if (data.cuentaCorriente) {
-    result.numeroCuenta = data.cuentaCorriente;
-  }
+  // La cuenta corriente del cliente NO se copia: el IBAN del SEPA es el de la
+  // cuenta de adeudo, que se escribe a mano en su apartado.
 
   if (data.codigoCuentaCotizacion) {
     result.cuentaCotizacion = data.codigoCuentaCotizacion;
