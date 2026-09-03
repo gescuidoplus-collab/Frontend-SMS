@@ -118,6 +118,9 @@ interface FormValues {
   sepaLocalidad?: string;
   sepaCodPostal?: string;
   sepaProvincia?: string;
+  sepaTitularTipoDocumento?: string;
+  sepaTitularNumeroDocumento?: string;
+  sepaFecha?: Dayjs;
   lugarFirma?: string;
   fechaFirma?: Dayjs;
 }
@@ -385,9 +388,11 @@ export default function DocumentosGrupoPage() {
     message.loading({ content: "Enviando documentos...", key: "sending" });
 
     try {
-      const { fechaNacimiento, documentos: seleccion, ...resto } = values;
+      const { fechaNacimiento, sepaFecha, documentos: seleccion, ...resto } = values;
       const payload = {
         ...resto,
+        // El backend la descompone en día/mes/año con el mismo formato que la de firma
+        sepaFecha: formatearFecha(sepaFecha, "completa"),
         // Se mandan en el orden fijo del paquete; el backend vuelve a validarlo
         documentos: TODAS_LAS_CLAVES.filter((c) => (seleccion || []).includes(c)),
         // El NIF es el único documento que se pide; el TA1 y el SEPA marcan la
@@ -822,9 +827,9 @@ export default function DocumentosGrupoPage() {
                 Datos para la domiciliación
               </Divider>
               <Text type="secondary" style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
-                El titular de la cuenta es la persona de «Datos Personales»: su nombre y
-                apellidos y su NIF se copian solos. Estos campos son los del titular y no
-                salen de «Dirección».
+                Estos campos son los del titular de la cuenta y no salen de «Dirección». El
+                nombre del titular se forma uniendo nombres y apellidos de «Datos Personales».
+                Si dejas vacíos el documento o la fecha, se usan el NIF y la fecha de firma.
               </Text>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
@@ -848,8 +853,33 @@ export default function DocumentosGrupoPage() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={8}>
-                  <Form.Item label="Provincia" name="sepaProvincia" style={{ marginBottom: 0 }}>
+                  <Form.Item label="Provincia" name="sepaProvincia">
                     <Input placeholder="Ej. Bizkaia" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={14}>
+                  <Form.Item
+                    label="Documento identificativo del titular de la cuenta"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Space.Compact style={{ width: "100%" }}>
+                      <Form.Item name="sepaTitularTipoDocumento" noStyle>
+                        <Select style={{ width: "45%" }} placeholder="Tipo" allowClear>
+                          <Select.Option value="dni">D.N.I.</Select.Option>
+                          <Select.Option value="nie">Tarjeta de extranjero</Select.Option>
+                          <Select.Option value="pasaporte">Pasaporte</Select.Option>
+                          <Select.Option value="cif">C.I.F.</Select.Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item name="sepaTitularNumeroDocumento" noStyle>
+                        <Input style={{ width: "55%" }} placeholder="Nº de documento" />
+                      </Form.Item>
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={10}>
+                  <Form.Item label="Fecha" name="sepaFecha" style={{ marginBottom: 0 }}>
+                    <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
                   </Form.Item>
                 </Col>
               </Row>
