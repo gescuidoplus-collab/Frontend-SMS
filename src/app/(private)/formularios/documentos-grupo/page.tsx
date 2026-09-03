@@ -746,15 +746,8 @@ export default function DocumentosGrupoPage() {
                     <Input placeholder="Ej. 1234567890" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Titular de la Cuenta"
-                    name="titularCuenta"
-                    tooltip="Aparece en el SEPA. Si se deja vacío se usa el nombre de la persona del formulario"
-                  >
-                    <Input placeholder="Por defecto, la persona del formulario" />
-                  </Form.Item>
-                </Col>
+                {/* El titular de la cuenta vive en el apartado del SEPA, que es
+                    el único modelo que lo usa */}
               </Row>
             </Card>
 
@@ -827,14 +820,22 @@ export default function DocumentosGrupoPage() {
                 Datos para la domiciliación
               </Divider>
               <Text type="secondary" style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
-                Estos campos son los del titular de la cuenta y no salen de «Dirección». El
-                nombre del titular se forma uniendo nombres y apellidos de «Datos Personales».
-                Si dejas vacíos el documento o la fecha, se usan el NIF y la fecha de firma.
+                Estos campos son los del titular de la cuenta de adeudo, que puede ser otra
+                persona: no salen de «Datos Personales» ni de «Dirección». Si dejas vacíos el
+                documento o la fecha, se usan el NIF y la fecha de firma.
               </Text>
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <Form.Item label="IBAN" name="numeroCuenta">
                     <Input placeholder="Ej. ES9121000418450200051332" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label="Apellidos y nombre o razón social del titular de la cuenta"
+                    name="titularCuenta"
+                  >
+                    <Input placeholder="Ej. Alonso Manso, María del Carmen" />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
