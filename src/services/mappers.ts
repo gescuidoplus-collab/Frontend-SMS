@@ -31,6 +31,7 @@ export interface DocumentosGrupoFormValues {
   codigoSwift?: string;
   numeroCuenta?: string;
   cuentaCotizacion?: string;
+  naf?: string;
   correo?: string;
   telefono?: string;
   razonSocial?: string;
@@ -218,7 +219,7 @@ export function mapEmpleadoToDocumentosGrupo(
  * El NIE español empieza por X, Y o Z; cualquier otra cosa se trata como DNI.
  * CloudNavis no distingue entre uno y otro, así que hay que mirarlo aquí.
  */
-function tipoDeDocumento(dni: string): 'dni' | 'nie' {
+export function tipoDeDocumento(dni: string): 'dni' | 'nie' {
   return /^[XYZ]/i.test(dni.trim()) ? 'nie' : 'dni';
 }
 
@@ -277,6 +278,10 @@ export function mapClienteToDocumentosGrupo(
 
   if (data.codigoCuentaCotizacion) {
     result.cuentaCotizacion = data.codigoCuentaCotizacion;
+  }
+
+  if (data.naf) {
+    result.naf = data.naf;
   }
 
   if (data.email) {

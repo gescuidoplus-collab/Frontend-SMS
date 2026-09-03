@@ -28,7 +28,7 @@ import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/es";
 import { fetchCloudnavisEmpleador } from "@/services/cloudnavisClient";
-import { mapClienteToDocumentosGrupo } from "@/services/mappers";
+import { mapClienteToDocumentosGrupo, tipoDeDocumento } from "@/services/mappers";
 import CloudnavisErrorModal from "@/components/CloudnavisErrorModal";
 import LoginRequeridoModal from "@/components/LoginRequeridoModal";
 import { useSesionEnlace } from "@/lib/useSesionEnlace";
@@ -91,8 +91,7 @@ interface FormValues {
   nombres?: string;
   nif?: string;
   sexo?: string;
-  numeroDocumento?: string;
-  tipoDocumento?: string;
+  naf?: string;
   fechaNacimiento?: Dayjs;
   tipoVia?: string;
   nombreVia?: string;
@@ -114,6 +113,14 @@ interface FormValues {
   numeroDocumentoEmpleador?: string;
   sepaTipoSolicitud?: string;
   sepaRegimen?: string;
+  // Datos para la domiciliación del SEPA: van aparte, no salen de Dirección
+  sepaDomicilio?: string;
+  sepaLocalidad?: string;
+  sepaCodPostal?: string;
+  sepaProvincia?: string;
+  sepaTitularTipoDocumento?: string;
+  sepaTitularNumeroDocumento?: string;
+  sepaFecha?: Dayjs;
   lugarFirma?: string;
   fechaFirma?: Dayjs;
 }
@@ -381,11 +388,17 @@ export default function DocumentosGrupoPage() {
     message.loading({ content: "Enviando documentos...", key: "sending" });
 
     try {
-      const { fechaNacimiento, documentos: seleccion, ...resto } = values;
+      const { fechaNacimiento, sepaFecha, documentos: seleccion, ...resto } = values;
       const payload = {
         ...resto,
+        // El backend la descompone en día/mes/año con el mismo formato que la de firma
+        sepaFecha: formatearFecha(sepaFecha, "completa"),
         // Se mandan en el orden fijo del paquete; el backend vuelve a validarlo
         documentos: TODAS_LAS_CLAVES.filter((c) => (seleccion || []).includes(c)),
+        // El NIF es el único documento que se pide; el TA1 y el SEPA marcan la
+        // casilla DNI/NIE, y eso se deduce de su primera letra.
+        numeroDocumento: values.nif || "",
+        tipoDocumento: values.nif ? tipoDeDocumento(values.nif) : "",
         fechaFirma: formatearFecha(values.fechaFirma, "completa"),
         diaNacimiento: fechaNacimiento?.date(),
         mesNacimiento: fechaNacimiento ? fechaNacimiento.month() + 1 : undefined,
@@ -621,18 +634,14 @@ export default function DocumentosGrupoPage() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
-                  <Form.Item label="Documento" style={{ marginBottom: 0 }}>
-                    <Space.Compact style={{ width: "100%" }}>
-                      <Form.Item name="tipoDocumento" noStyle>
-                        <Select style={{ width: "35%" }} placeholder="Tipo">
-                          <Select.Option value="dni">DNI</Select.Option>
-                          <Select.Option value="nie">NIE</Select.Option>
-                        </Select>
-                      </Form.Item>
-                      <Form.Item name="numeroDocumento" noStyle>
-                        <Input style={{ width: "65%" }} placeholder="Ej. 12345678" />
-                      </Form.Item>
-                    </Space.Compact>
+                  {/* Antes había aquí un "Documento" (tipo + número) que repetía
+                      el NIF. El tipo (DNI/NIE) se deduce ahora del propio NIF. */}
+                  <Form.Item
+                    label="NAF (Número de Afiliación)"
+                    name="naf"
+                    tooltip="Va en el SEPA como Nº de afiliación (3). Si se deja vacío, ahí se usa la cuenta de cotización."
+                  >
+                    <Input placeholder="Ej. 481086003318" />
                   </Form.Item>
                 </Col>
               </Row>
@@ -727,14 +736,7 @@ export default function DocumentosGrupoPage() {
                     <Input placeholder="Ej. BBVAESMM" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item
-                    label="Número de Cuenta"
-                    name="numeroCuenta"
-                  >
-                    <Input placeholder="Ej. ES9121000418450200051332" />
-                  </Form.Item>
-                </Col>
+                {/* El IBAN solo lo usa el SEPA, así que vive en su apartado */}
                 <Col xs={24} sm={12}>
                   <Form.Item
                     label="Cuenta de Cotización"
@@ -817,9 +819,70 @@ export default function DocumentosGrupoPage() {
               <Form.Item label="Tipo de solicitud" name="sepaTipoSolicitud">
                 <CasillasUnicas opciones={SEPA_TIPOS_SOLICITUD} />
               </Form.Item>
-              <Form.Item label="Régimen" name="sepaRegimen" style={{ marginBottom: 0 }}>
+              <Form.Item label="Régimen" name="sepaRegimen">
                 <CasillasUnicas opciones={SEPA_REGIMENES} />
               </Form.Item>
+
+              <Divider orientation="left" plain>
+                Datos para la domiciliación
+              </Divider>
+              <Text type="secondary" style={{ display: "block", marginBottom: 12, fontSize: 12 }}>
+                Estos campos son los del titular de la cuenta y no salen de «Dirección». El
+                nombre del titular se forma uniendo nombres y apellidos de «Datos Personales».
+                Si dejas vacíos el documento o la fecha, se usan el NIF y la fecha de firma.
+              </Text>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item label="IBAN" name="numeroCuenta">
+                    <Input placeholder="Ej. ES9121000418450200051332" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item label="Domicilio del titular de la cuenta" name="sepaDomicilio">
+                    <Input placeholder="Ej. Calle Mayor 12, 3º B" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={10}>
+                  <Form.Item label="Localidad" name="sepaLocalidad">
+                    <Input placeholder="Ej. Bilbao" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={6}>
+                  <Form.Item label="Código Postal" name="sepaCodPostal">
+                    <Input placeholder="Ej. 48001" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label="Provincia" name="sepaProvincia">
+                    <Input placeholder="Ej. Bizkaia" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={14}>
+                  <Form.Item
+                    label="Documento identificativo del titular de la cuenta"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Space.Compact style={{ width: "100%" }}>
+                      <Form.Item name="sepaTitularTipoDocumento" noStyle>
+                        <Select style={{ width: "45%" }} placeholder="Tipo" allowClear>
+                          <Select.Option value="dni">D.N.I.</Select.Option>
+                          <Select.Option value="nie">Tarjeta de extranjero</Select.Option>
+                          <Select.Option value="pasaporte">Pasaporte</Select.Option>
+                          <Select.Option value="cif">C.I.F.</Select.Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item name="sepaTitularNumeroDocumento" noStyle>
+                        <Input style={{ width: "55%" }} placeholder="Nº de documento" />
+                      </Form.Item>
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={10}>
+                  <Form.Item label="Fecha" name="sepaFecha" style={{ marginBottom: 0 }}>
+                    <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" placeholder="DD/MM/AAAA" />
+                  </Form.Item>
+                </Col>
+              </Row>
             </Card>
 
             {/* Sección: Firma */}
