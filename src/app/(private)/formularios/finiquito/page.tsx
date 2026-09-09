@@ -223,7 +223,7 @@ const calcularInicioComputoVacaciones = (
 // Antigüedad < 1 año → 7 días de preaviso; ≥ 1 año → 20 días (RD-ley 16/2022)
 const sugerirDiasPreaviso = (fechadesde?: Dayjs, fechasalariofinalconanio?: Dayjs): number => {
   if (!fechadesde || !fechasalariofinalconanio) return 7;
-  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day");
+  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day") + 1;
   return diasTrabajados >= 365 ? 20 : 7;
 };
 
@@ -250,7 +250,7 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
     return null;
   }
 
-  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day");
+  const diasTrabajados = fechasalariofinalconanio.diff(fechadesde, "day") + 1;
   if (diasTrabajados < 0) return null;
 
   const salarioDiarioNeto = salarioNeto / 30;
@@ -261,7 +261,7 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
   const diasPeriodo =
     tipoJornada === "finde"
       ? contarDiasFinde(inicioPeriodo, fechasalariofinalconanio)
-      : fechasalariofinalconanio.diff(inicioPeriodo, "day");
+      : fechasalariofinalconanio.diff(inicioPeriodo, "day") + 1;
 
   // Quien solo trabaja fines de semana cobra el mes entero en esos días, así
   // que el precio del día sale de repartir el salario entre los findes de ese
@@ -308,7 +308,7 @@ const calcularFiniquito = (values: FormValues): Calculado | null => {
   const diasComputoVacaciones =
     tipoJornada === "finde"
       ? contarDiasFinde(inicioVacaciones, fechasalariofinalconanio)
-      : fechasalariofinalconanio.diff(inicioVacaciones, "day");
+      : fechasalariofinalconanio.diff(inicioVacaciones, "day") + 1;
   const diasVacacionesGenerados = (diasComputoVacaciones * 30) / 365;
   const diasVacacionesAPagar = Math.max(
     0,
